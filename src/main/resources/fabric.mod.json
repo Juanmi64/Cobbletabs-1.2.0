@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "cobbletabs",
+	"version": "${version}",
+	"name": "CobbleTabs",
+	"description": "Añade pestañas al inventario que ejecutan comandos con un clic, con editor dentro del juego y presets cargables. Cobblemon opcional.",
+	"authors": [
+		"Juanmi64"
+	],
+	"contact": {
+		"homepage": "https://github.com/Juanmi64",
+		"sources": "https://github.com/Juanmi64"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/cobbletabs/icon.png",
+	"environment": "client",
+	"accessWidener": "cobbletabs.accesswidener",
+	"entrypoints": {
+		"client": [
+			"com.cobbletabs.client.CobbleTabsClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"cobblemon": "*"
+	}
+}

@@ -1,0 +1,92 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	// Necesario para que Loom remapee los metadatos Kotlin de Cobblemon en el entorno de pruebas.
+	// Debe ser >= a la versión de Kotlin de fabric-language-kotlin (2.4.20) o el remap falla
+	// con "kotlinx-metadata-jvm cannot write metadata for future compiler versions".
+	id 'org.jetbrains.kotlin.jvm' version '2.4.20'
+}
+
+repositories {
+	// Repositorio de Cobblemon para la prueba en runClient
+	maven {
+		url = "https://maven.impactdev.net/repository/development/"
+	}
+}
+
+loom {
+	accessWidenerPath = file("src/main/resources/cobbletabs.accesswidener")
+
+	splitEnvironmentSourceSets()
+
+	mods {
+		"${modid}" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API. This is technically optional, but you probably want it anyway.
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Cobblemon real (para runClient): requiere también fabric-language-kotlin.
+	modRuntimeOnly "com.cobblemon:fabric:1.6.1+1.21.1"
+	modRuntimeOnly "net.fabricmc:fabric-language-kotlin:1.14.1+kotlin.2.4.20"
+}
+
+// Modo auto-test: ./gradlew runClient -Pselftest=true
+// Abre directamente el mundo "New World" (QuickPlay), crea el archivo flag que
+// activa CobbleTabsSelftest y el propio test borra al arrancar. Sin -Pselftest,
+// cualquier flag residual se elimina para que el runClient normal sea normal.
+def selftest = project.hasProperty("selftest") ? project.property("selftest").toString() : "false"
+
+tasks.matching { it.name == "runClient" }.configureEach {
+	doFirst {
+		def flag = layout.projectDirectory.file("run/config/cobbletabs_selftest.flag").asFile
+		if (selftest == "true") {
+			flag.parentFile.mkdirs()
+			flag.text = "run"
+			it.args "--quickPlaySingleplayer", "New World"
+		} else {
+			flag.delete()
+		}
+	}
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+}
+
+java {
+	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+	// if it is present.
+	// If you remove this line, sources will not be generated.
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName"}
+	}
+}

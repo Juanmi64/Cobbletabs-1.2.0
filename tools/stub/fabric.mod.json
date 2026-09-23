@@ -1,0 +1,9 @@
+{
+	"schemaVersion": 1,
+	"id": "cobblemon",
+	"version": "1.6.1+stub",
+	"name": "Cobblemon (stub para runClient)",
+	"description": "Stub vacio solo para satisfacer la dependencia en el entorno de desarrollo. NO usar en el juego real.",
+	"environment": "*",
+	"depends": {}
+}
