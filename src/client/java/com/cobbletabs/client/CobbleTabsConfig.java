@@ -101,6 +101,11 @@ public class CobbleTabsConfig {
 		 * "bottom_left"/"abajo_izquierda", "top_right"/"arriba_derecha", "top_left"/"arriba_izquierda".
 		 */
 		public String corner = "bottom_right";
+		/**
+		 * Pestañas admin por fila (1-8): cuántas caben en la primera fila antes de
+		 * pasar a una segunda fila hacia el interior de la pantalla. 5 por defecto.
+		 */
+		public int maxPerRow = 5;
 	}
 
 	public static class TabEntry {
@@ -191,6 +196,11 @@ public class CobbleTabsConfig {
 			admin.corner = "bottom_right";
 		}
 		admin.corner = normalizeCorner(admin.corner);
+		if (admin.maxPerRow < 1) {
+			admin.maxPerRow = 1;
+		} else if (admin.maxPerRow > 8) {
+			admin.maxPerRow = 8;
+		}
 		tabs = sanitizeTabList(tabs);
 		adminTabs = sanitizeTabList(adminTabs);
 	}
@@ -273,13 +283,16 @@ public class CobbleTabsConfig {
 
 	public static List<TabEntry> defaultTabs() {
 		List<TabEntry> list = new ArrayList<>();
-		// Pestañas clásicas (activadas)
-		list.add(entry("pc", "/pc", "cobblemon:pc", "PC", "gray", true));
-		list.add(entry("wiki", "/wiki", "cobblemon:pokedex_red", "Wiki", "light_red", true));
-		list.add(entry("daycare", "/daycare", "minecraft:book", "Daycare", "pink", true));
-		list.add(entry("daily", "/daily", "minecraft:clock", "Daily", "yellow", true));
-		list.add(entry("sts", "/sts", "cobblemon:verdant_ball", "STS", "white", true));
-		list.add(entry("wt", "/wt", "cobblemon:premier_ball", "WT", "green", true));
+		// Pestañas activas por defecto (desde 1.2.1: solo Menu y RTP)
+		list.add(entry("menu", "/menu", "minecraft:compass", "Menu", "aqua", true));
+		list.add(entry("rtp", "/rtp", "minecraft:ender_pearl", "RTP", "green", true));
+		// Pestañas clásicas (desactivadas por defecto desde 1.2.1)
+		list.add(entry("pc", "/pc", "cobblemon:pc", "PC", "gray", false));
+		list.add(entry("wiki", "/wiki", "cobblemon:pokedex_red", "Wiki", "light_red", false));
+		list.add(entry("daycare", "/daycare", "minecraft:book", "Daycare", "pink", false));
+		list.add(entry("daily", "/daily", "minecraft:clock", "Daily", "yellow", false));
+		list.add(entry("sts", "/sts", "cobblemon:verdant_ball", "STS", "white", false));
+		list.add(entry("wt", "/wt", "cobblemon:premier_ball", "WT", "green", false));
 		// Huecos extra (2 más por lado): vienen desactivados. Actívalos en
 		// config/cobbletabs.json y ponles comando, nombre e icono.
 		list.add(entry("extra1", "/extra1", "minecraft:nether_star", "", "", false));
@@ -326,11 +339,7 @@ public class CobbleTabsConfig {
 		}
 	}
 
-	/**
-	 * Garantiza que existan las 3 pestañas admin por defecto: si la config no las
-	 * tiene, se añaden al final (desactivadas) sin tocar las pestañas existentes.
-	 */
-	/**
+/**
 	 * Activa la fila admin y, con ella, las pestañas admin integradas que sigan
 	 * desactivadas (Survival/Creative/Spectator). Se usa desde el editor, para que
 	 * "Activar admin" muestre algo sin tener que activar cada pestaña a mano.

@@ -29,7 +29,7 @@ Mod **cliente** para **Minecraft 1.21.1 (Fabric)** que añade pestañas en los l
 1. Instala el [Fabric Loader](https://fabricmc.net/use/installer/) para Minecraft **1.21.1**
 2. Descarga y añade a la carpeta `mods`:
    - [Fabric API](https://modrinth.com/mod/fabric-api) para 1.21.1
-   - `cobbletabs-1.2.0.jar` (este mod)
+   - `cobbletabs-1.2.1.jar` (este mod)
    - [Cobblemon](https://modrinth.com/mod/cobblemon) **(opcional)**: solo hace falta para los iconos de Cobblemon de las pestañas por defecto; sin él, esos iconos se muestran como papel y el mod funciona igual
 3. Inicia el juego. La primera vez se generará `config/cobbletabs/cobbletabs.json`
 
@@ -54,18 +54,21 @@ La tecla F8 se puede cambiar en **Opciones → Controles → CobbleTabs → Reca
 
 ### Pestañas por defecto
 
-| Pestaña | Comando | Icono | Color |
-|---------|---------|-------|-------|
-| PC | `/pc` | `cobblemon:pc` | Gris |
-| Wiki | `/wiki` | `cobblemon:pokedex_red` | Rojo claro |
-| Daycare | `/daycare` | `minecraft:book` | Rosa |
-| Daily | `/daily` | `minecraft:clock` | Amarillo |
-| STS | `/sts` | `cobblemon:verdant_ball` | Blanco |
-| WT | `/wt` | `cobblemon:premier_ball` | Verde |
-| Extra 1-4 | (por configurar) | `minecraft:nether_star` | Aqua / Naranja / Morado / Azul |
+| Pestaña | Comando | Icono | Color | Activa |
+|---------|---------|-------|-------|--------|
+| Menu | `/menu` | `minecraft:compass` | Aqua (cian) | ✅ Sí |
+| RTP | `/rtp` | `minecraft:ender_pearl` | Verde | ✅ Sí |
+| PC | `/pc` | `cobblemon:pc` | Gris | No |
+| Wiki | `/wiki` | `cobblemon:pokedex_red` | Rojo claro | No |
+| Daycare | `/daycare` | `minecraft:book` | Rosa | No |
+| Daily | `/daily` | `minecraft:clock` | Amarillo | No |
+| STS | `/sts` | `cobblemon:verdant_ball` | Blanco | No |
+| WT | `/wt` | `cobblemon:premier_ball` | Verde | No |
+| Extra 1-4 | (por configurar) | `minecraft:nether_star` | Aqua / Naranja / Morado / Azul | No |
 
-Las 4 pestañas **extra** vienen **desactivadas**: son huecos listos para que les asignes comando,
-nombre e icono desde la config cuando el server añada más comandos.
+Desde la **1.2.1** vienen activas solo **Menu** y **RTP**. El resto de pestañas (clásicas y los 4
+huecos extra) están en la config **desactivadas**: actívalas con `"enabled": true` desde la config
+o desde el editor ingame.
 
 > Los comandos deben existir en el servidor donde juegas (por ejemplo, vía plugins). Si el servidor no los tiene, verás el error estándar de comando desconocido.
 
@@ -76,7 +79,7 @@ En tu inventario (survival **y creativo**) hay un botoncito de **libro y pluma**
 - **Añadir** una pestaña nueva y editar las existentes: **comando**, **icono** (id de item, con previsualización), **texto**, **color** — paleta rápida o **escribe tu RGB hex `#RRGGBB` (o un nombre) en el campo de color**, con vista previa en vivo — y **negrita**
 - **Activar/desactivar** una pestaña sin borrarla (toggle Sí/No en el diálogo)
 - **Reordenar arrastrando** el icono de cada fila (el orden de la lista es el orden en pantalla)
-- **Borrar** una pestaña con la ✕ del diálogo (los huecos extra/admin se desactivan en vez de borrarse)
+- **Borrar** una pestaña con la ✕ del diálogo o **directamente desde la lista** con el **✕ al final de cada fila** (borrado rápido, sin abrir el diálogo; los huecos extra/admin se desactivan en vez de borrarse)
 - Cambiar entre la lista de **pestañas** normales y las **admin** con el primer botón
 - **Fila admin: Sí/No**: activa o desactiva la fila de pestañas admin sin tocar el JSON (al activarla, se encienden las pestañas admin integradas para que se vea algo al instante)
 - **Esquina**: abre un menú desplegable con las **4 esquinas de la pantalla** (la activa resaltada) y aplica la que elijas
@@ -135,19 +138,21 @@ Edítalo con el juego cerrado **o** edítalo y pulsa **F8** para aplicarlo al mo
   // La primera mitad se coloca a la izquierda y el resto a la derecha.
   "tabs": [
     {
-      "id": "pc",              // identificador interno (único, sin espacios)
-      "command": "/pc",        // comando a ejecutar (se añade "/" si falta)
-      "icon": "cobblemon:pc",  // item usado como icono (cualquier mod)
+      "id": "menu",            // identificador interno (único, sin espacios)
+      "command": "/menu",      // comando a ejecutar (se añade "/" si falta)
+      "icon": "minecraft:compass", // item usado como icono (cualquier mod)
       "enabled": true,         // false = pestaña oculta sin borrarla
-      "label": "PC",           // nombre mostrado (vacío = traducción por defecto)
-      "color": "gray",         // color del nombre (ver tabla de colores)
+      "label": "Menu",         // nombre mostrado (vacío = traducción por defecto)
+      "color": "aqua",         // color del nombre (ver tabla de colores)
       "bold": true             // nombre en negrita
     },
-    { "id": "wiki",    "command": "/wiki",    "icon": "cobblemon:pokedex_red",  "enabled": true, "label": "Wiki",    "color": "light_red", "bold": true },
-    { "id": "daycare", "command": "/daycare", "icon": "minecraft:book",         "enabled": true, "label": "Daycare", "color": "pink",      "bold": true },
-    { "id": "daily",   "command": "/daily",   "icon": "minecraft:clock",        "enabled": true, "label": "Daily",   "color": "yellow",    "bold": true },
-    { "id": "sts",     "command": "/sts",     "icon": "cobblemon:verdant_ball", "enabled": true, "label": "STS",     "color": "white",     "bold": true },
-    { "id": "wt",      "command": "/wt",      "icon": "cobblemon:premier_ball", "enabled": true, "label": "WT",      "color": "green",     "bold": true },
+    { "id": "rtp",     "command": "/rtp",     "icon": "minecraft:ender_pearl",  "enabled": true,  "label": "RTP",     "color": "green",     "bold": true },
+    { "id": "pc",      "command": "/pc",      "icon": "cobblemon:pc",           "enabled": false, "label": "PC",      "color": "gray",      "bold": true },
+    { "id": "wiki",    "command": "/wiki",    "icon": "cobblemon:pokedex_red",  "enabled": false, "label": "Wiki",    "color": "light_red", "bold": true },
+    { "id": "daycare", "command": "/daycare", "icon": "minecraft:book",         "enabled": false, "label": "Daycare", "color": "pink",      "bold": true },
+    { "id": "daily",   "command": "/daily",   "icon": "minecraft:clock",        "enabled": false, "label": "Daily",   "color": "yellow",    "bold": true },
+    { "id": "sts",     "command": "/sts",     "icon": "cobblemon:verdant_ball", "enabled": false, "label": "STS",     "color": "white",     "bold": true },
+    { "id": "wt",      "command": "/wt",      "icon": "cobblemon:premier_ball", "enabled": false, "label": "WT",      "color": "green",     "bold": true },
 
     // Huecos extra (2 más por lado): desactivados hasta que les pongas comando,
     // nombre e icono. Pon "enabled": true para mostrarlos.
@@ -173,7 +178,8 @@ Edítalo con el juego cerrado **o** edítalo y pulsa **F8** para aplicarlo al mo
     "enabled": false,           // true = activa la fila de pestañas admin
     "showToggleButton": true,   // false = quita el botón de ocultar/mostrar la fila admin
     "visible": true,            // estado actual del botón admin (se guarda solo)
-    "corner": "bottom_right"    // esquina de la pantalla: bottom_right, bottom_left, top_right, top_left
+    "corner": "bottom_right",   // esquina de la pantalla: bottom_right, bottom_left, top_right, top_left
+    "maxPerRow": 5              // pestañas admin por fila (1-8); las demás pasan a una segunda fila
   },
   "adminTabs": [
     // Mismas opciones que una pestaña normal (id, command, icon, enabled, label, color, bold).
@@ -241,6 +247,7 @@ Fila aparte en una **esquina de la pantalla**, fuera de la GUI del inventario, p
 - Al hacer clic ejecutan el comando y cierran el inventario, igual que las demás
 - **Esquina configurable** con `admin.corner`: `bottom_right` (por defecto), `bottom_left`, `top_right` o `top_left`. También en español: `abajo_derecha`, `abajo_izquierda`, `arriba_derecha`, `arriba_izquierda` (o abreviado `abajo_izq`, `sup_der`…). Si otro mod tapa la esquina, mueve el conjunto a otra — desde el **editor ingame** con el botón **"Esquina"**, un desplegable con las 4 opciones
 - **Botón toggle propio**: un botoncito junto a la fila (icono de barrera = visible, ojo de ender = oculta) que muestra/oculta solo la fila admin; se guarda en `admin.visible` y es independiente del toggle de las pestañas laterales. Se puede quitar con `"showToggleButton": false` dentro de `admin`
+- **Dos filas automáticas**: hasta **5 pestañas por fila** (configurable con `admin.maxPerRow`, de 1 a 8); si añades más, el resto forma una **segunda fila** hacia el interior de la pantalla (encima de la primera en las esquinas inferiores, debajo en las superiores) y el botón toggle se aparta solo para no solaparse
 - No aparecen en cofres ni enderchests
 
 > **Migración automática:** si tu config es de una versión anterior, las 3 pestañas admin se añaden solas al final, desactivadas, sin tocar tus pestañas existentes. También con **F8**.
@@ -253,7 +260,7 @@ Fila aparte en una **esquina de la pantalla**, fuera de la GUI del inventario, p
 
 ```bash
 # Compilar el jar (requiere JDK 21)
-./gradlew build          # resultado en build/libs/cobbletabs-1.2.0.jar
+./gradlew build          # resultado en build/libs/cobbletabs-1.2.1.jar
 
 # Abrir el juego con el mod cargado (usa Cobblemon real descargado del Maven)
 ./gradlew runClient

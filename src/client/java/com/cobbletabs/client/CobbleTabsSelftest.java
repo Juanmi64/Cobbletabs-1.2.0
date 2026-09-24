@@ -266,12 +266,18 @@ final class CobbleTabsSelftest {
 			return true;
 		});
 
-		// --- Editor: borrar la pestaña añadida (última fila) ---
+		// --- Editor: borrar la pestaña añadida (botón ✕ de la última fila) ---
 		step("clic última fila", c -> {
 			if (editor().selftestDialogOpen()) {
 				return true;
 			}
-			c.screen.mouseClicked(130, 45 + baseTabs * 14, 0);
+			// Con 13 pestañas la última fila queda fuera de las 11 visibles: baja el
+			// scroll al fondo (cada notcho de rueda mueve una fila)
+			for (int i = 0; i < 15; i++) {
+				c.screen.mouseScrolled(130, 100, 0, -1);
+			}
+			int visible = Math.min(CobbleTabsClient.config().tabs.size(), 11);
+			c.screen.mouseClicked(130, 45 + (visible - 1) * 14, 0);
 			return editor().selftestDialogOpen();
 		});
 		step("comprobar diálogo borrado", c -> check("diálogo abierto", editor().selftestDialogOpen()));
@@ -285,15 +291,53 @@ final class CobbleTabsSelftest {
 			return c.screen instanceof ConfirmScreen;
 		});
 		confirmYes("borrar pestaña");
-		step("comprobar borrado", c -> check("pestaña borrada", CobbleTabsClient.config().tabs.size() == baseTabs));
+		step("comprobar borrado", c -> {
+			check("pestaña borrada", CobbleTabsClient.config().tabs.size() == baseTabs);
+			check("diálogo cerrado tras borrar", !editor().selftestDialogOpen());
+			return true;
+		});
+
+		// --- Editor: borrado rápido con el ✕ de la fila (sin abrir el diálogo) ---
+		step("clic Añadir (borrado rápido)", c -> {
+			if (editor().selftestDialogOpen()) {
+				return true;
+			}
+			c.screen.mouseClicked(97, 220, 0);
+			return editor().selftestDialogOpen();
+		});
+		step("guardar nueva pestaña (borrado rápido)", c -> {
+			if (!editor().selftestDialogOpen()) {
+				return true;
+			}
+			c.screen.mouseClicked(80, 170, 0);
+			return !editor().selftestDialogOpen();
+		});
+		step("clic ✕ de la última fila (borrado rápido)", c -> {
+			int size = CobbleTabsClient.config().tabs.size();
+			if (size != baseTabs + 1) {
+				return false; // la pestaña extra aún no está guardada
+			}
+			for (int i = 0; i < 15; i++) {
+				c.screen.mouseScrolled(130, 100, 0, -1);
+			}
+			int visible = Math.min(size, 11);
+			int rowY = 45 + (visible - 1) * 14;
+			c.screen.mouseClicked(CobbleTabsEditScreen.selftestDelBoxX() + 4, rowY, 0);
+			return CobbleTabsClient.config().tabs.size() == baseTabs;
+		});
+		step("comprobar borrado rápido", c -> check("borrado rápido sin diálogo", CobbleTabsClient.config().tabs.size() == baseTabs));
 
 		// --- Editor: modo admin, añadir y borrar ---
 		step("clic modo Admin", c -> {
 			if (editor().selftestDialogOpen()) {
 				return false;
 			}
+			// Idempotente: solo pulsa si el modo admin aún no está activo
+			if (editor().selftestAdminMode()) {
+				return true;
+			}
 			c.screen.mouseClicked(51, 220, 0);
-			return true;
+			return editor().selftestAdminMode();
 		});
 		step("clic Añadir (admin)", c -> {
 			if (editor().selftestDialogOpen()) {
@@ -315,7 +359,11 @@ final class CobbleTabsSelftest {
 			if (editor().selftestDialogOpen()) {
 				return true;
 			}
-			c.screen.mouseClicked(130, 45 + baseAdmin * 14, 0);
+			for (int i = 0; i < 15; i++) {
+				c.screen.mouseScrolled(130, 100, 0, -1);
+			}
+			int visible = Math.min(CobbleTabsClient.config().adminTabs.size(), 11);
+			c.screen.mouseClicked(130, 45 + (visible - 1) * 14, 0);
 			return editor().selftestDialogOpen();
 		});
 		step("clic ✕ (admin)", c -> {
@@ -328,7 +376,11 @@ final class CobbleTabsSelftest {
 			return c.screen instanceof ConfirmScreen;
 		});
 		confirmYes("borrar admin");
-		step("comprobar admin borrada", c -> check("admin borrada", CobbleTabsClient.config().adminTabs.size() == baseAdmin));
+		step("comprobar admin borrada", c -> {
+			check("admin borrada", CobbleTabsClient.config().adminTabs.size() == baseAdmin);
+			check("diálogo cerrado tras borrar admin", !editor().selftestDialogOpen());
+			return true;
+		});
 
 		// --- Opciones de la fila admin: activarla, girar la esquina y desactivarla ---
 		step("clic fila admin ON", c -> {
@@ -392,8 +444,8 @@ final class CobbleTabsSelftest {
 		confirmYes("cargar default");
 		step("comprobar default cargado", c -> {
 			List<CobbleTabsConfig.TabEntry> tabs = CobbleTabsClient.config().tabs;
-			check("default: 10 pestañas", tabs.size() == 10);
-			check("default: primera = pc", !tabs.isEmpty() && "pc".equals(tabs.get(0).id));
+			check("default: 12 pestañas", tabs.size() == 12);
+			check("default: primera = menu", !tabs.isEmpty() && "menu".equals(tabs.get(0).id));
 			return true;
 		});
 		step("seleccionar preset pokegalaxia (fila 1)", c -> {
@@ -486,7 +538,7 @@ final class CobbleTabsSelftest {
 			for (CobbleTabsPresets.Preset p : CobbleTabsPresets.savedPresets()) {
 				if (p.name().equals("import")) {
 					listed = true;
-					check("import: pestañas del JSON", p.tabs().size() == 10);
+					check("import: pestañas del JSON", p.tabs().size() == 12);
 				}
 			}
 			check("import listado", listed);
@@ -516,7 +568,7 @@ final class CobbleTabsSelftest {
 		});
 		step("comprobar config restaurada", c -> {
 			List<CobbleTabsConfig.TabEntry> tabs = CobbleTabsClient.config().tabs;
-			check("tabs restauradas", !tabs.isEmpty() && "pc".equals(tabs.get(0).id));
+			check("tabs restauradas", !tabs.isEmpty() && "menu".equals(tabs.get(0).id));
 			check("admin desactivada", !CobbleTabsClient.config().admin.enabled);
 			return true;
 		});
@@ -589,6 +641,17 @@ final class CobbleTabsSelftest {
 				&& !CobbleTabsConfig.isProtectedId("pc"));
 		check("normalizeCorner es/en", CobbleTabsConfig.normalizeCorner("abajo_izquierda").equals("bottom_left")
 				&& CobbleTabsConfig.normalizeCorner("arriba der").equals("top_right"));
+		CobbleTabsConfig cfgMpr = CobbleTabsClient.config();
+		int savedMaxPerRow = cfgMpr.admin.maxPerRow;
+		cfgMpr.admin.maxPerRow = 99;
+		cfgMpr.sanitize();
+		check("maxPerRow se clampa a 8", cfgMpr.admin.maxPerRow == 8);
+		cfgMpr.admin.maxPerRow = 0;
+		cfgMpr.sanitize();
+		check("maxPerRow mínimo 1", cfgMpr.admin.maxPerRow == 1);
+		cfgMpr.admin.maxPerRow = savedMaxPerRow;
+		cfgMpr.sanitize();
+		CobbleTabsConfig.save(cfgMpr);
 		CobbleTabsConfig cfgAdm = CobbleTabsClient.config();
 		cfgAdm.admin.enabled = false;
 		cfgAdm.adminTabs.get(0).enabled = false;

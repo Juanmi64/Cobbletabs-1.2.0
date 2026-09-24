@@ -290,6 +290,8 @@ public class CobbleTabsClient implements ClientModInitializer {
 	private static final int ADMIN_MARGIN = 3;
 	/** Separación entre el botón toggle admin y la fila de pestañas admin. */
 	private static final int ADMIN_TOGGLE_GAP = 2;
+	/** Separación vertical entre la primera y la segunda fila de pestañas admin. */
+	private static final int ADMIN_ROW_GAP = 2;
 
 	/** Esquinas donde puede anclarse el conjunto admin (fila + botón toggle). */
 	private enum AdminCorner {
@@ -312,7 +314,7 @@ public class CobbleTabsClient implements ClientModInitializer {
 			};
 		}
 
-		/** Ancla Y de la primera pestaña admin. */
+		/** Ancla Y de la primera pestaña admin (la más cercana a la esquina). */
 		int firstTabY(int screenHeight) {
 			return switch (this) {
 				case TOP_LEFT, TOP_RIGHT -> ADMIN_MARGIN;
@@ -328,11 +330,15 @@ public class CobbleTabsClient implements ClientModInitializer {
 			};
 		}
 
-		/** Ancla Y del botón toggle, separado de la fila por ADMIN_TOGGLE_GAP. */
-		int toggleY(int screenHeight) {
+		/**
+		 * Ancla Y del botón toggle, separado del conjunto de filas por ADMIN_TOGGLE_GAP.
+		 * Con 2 filas de pestañas el toggle se aparta una fila más para no solaparse.
+		 */
+		int toggleY(int screenHeight, int rowCount) {
+			int rowsHeight = rowCount * TAB_HEIGHT + Math.max(0, rowCount - 1) * ADMIN_ROW_GAP;
 			return switch (this) {
-				case TOP_LEFT, TOP_RIGHT -> ADMIN_MARGIN + TAB_HEIGHT + ADMIN_TOGGLE_GAP;
-				case BOTTOM_LEFT, BOTTOM_RIGHT -> screenHeight - ADMIN_MARGIN - TAB_HEIGHT - ADMIN_TOGGLE_GAP - TOGGLE_SIZE;
+				case TOP_LEFT, TOP_RIGHT -> ADMIN_MARGIN + rowsHeight + ADMIN_TOGGLE_GAP;
+				case BOTTOM_LEFT, BOTTOM_RIGHT -> screenHeight - ADMIN_MARGIN - rowsHeight - ADMIN_TOGGLE_GAP - TOGGLE_SIZE;
 			};
 		}
 
@@ -343,10 +349,43 @@ public class CobbleTabsClient implements ClientModInitializer {
 				case TOP_RIGHT, BOTTOM_RIGHT -> -1;
 			};
 		}
+
+		/** Dirección vertical del apilado de filas (+1 hacia abajo en esquinas superiores, -1 hacia arriba en las inferiores). */
+		int stackDirY() {
+			return switch (this) {
+				case TOP_LEFT, TOP_RIGHT -> +1;
+				case BOTTOM_LEFT, BOTTOM_RIGHT -> -1;
+			};
+		}
+
+		/** Ancla X de la pestaña admin en la posición index (columna dentro de su fila). */
+		int tabX(int screenWidth, int index, int maxPerRow) {
+			int col = index % maxPerRow;
+			return firstTabX(screenWidth) + stackDirX() * col * (TAB_WIDTH + TAB_GAP);
+		}
+
+		/**
+		 * Ancla Y de la pestaña admin en la posición index: la primera fila es la más
+		 * cercana a la esquina y, al superar maxPerRow, el resto forma una segunda fila
+		 * hacia el interior de la pantalla (encima en las esquinas inferiores, debajo
+		 * en las superiores).
+		 */
+		int tabY(int screenHeight, int index, int maxPerRow) {
+			int row = index / maxPerRow;
+			return firstTabY(screenHeight) + stackDirY() * row * (TAB_HEIGHT + ADMIN_ROW_GAP);
+		}
 	}
 
 	/** Esquina activa del conjunto admin (config, resuelta al construir las pestañas). */
 	private static AdminCorner adminCorner = AdminCorner.BOTTOM_RIGHT;
+
+	/**
+	 * Pestañas admin por fila (configurable con "admin.maxPerRow", 1-8; 5 por defecto):
+	 * las demás pasan a una segunda fila hacia el interior de la pantalla.
+	 */
+	private static int adminMaxPerRow() {
+		return config == null || config.admin == null ? 5 : Math.max(1, config.admin.maxPerRow);
+	}
 
 	/** Dibuja la fila de pestañas admin en la esquina configurada de la pantalla. */
 	private static void renderAdminTabs(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -363,13 +402,14 @@ public class CobbleTabsClient implements ClientModInitializer {
 		}
 		int screenWidth = client.getWindow().getGuiScaledWidth();
 		int screenHeight = client.getWindow().getGuiScaledHeight();
-		int dirX = adminCorner.stackDirX();
-		// Primera pestaña pegada a la esquina; las siguientes se apilan hacia el centro de la pantalla
-		int x = adminCorner.firstTabX(screenWidth);
-		int y = adminCorner.firstTabY(screenHeight);
-		for (AdminTab tab : adminTabs) {
+		// Primera pestaña pegada a la esquina; las siguientes se apilan hacia el centro y,
+		// a partir de admin.maxPerRow, forman una segunda fila hacia el interior de la pantalla
+		int maxPerRow = adminMaxPerRow();
+		for (int i = 0; i < adminTabs.size(); i++) {
+			AdminTab tab = adminTabs.get(i);
+			int x = adminCorner.tabX(screenWidth, i, maxPerRow);
+			int y = adminCorner.tabY(screenHeight, i, maxPerRow);
 			renderTab(graphics, client, new Tab(tab.command(), tab.label(), tab.iconId()), x, y, mouseX, mouseY);
-			x += dirX * (TAB_WIDTH + TAB_GAP);
 		}
 	}
 
@@ -381,14 +421,13 @@ public class CobbleTabsClient implements ClientModInitializer {
 		Minecraft client = Minecraft.getInstance();
 		int screenWidth = client.getWindow().getGuiScaledWidth();
 		int screenHeight = client.getWindow().getGuiScaledHeight();
-		int dirX = adminCorner.stackDirX();
-		int x = adminCorner.firstTabX(screenWidth);
-		int y = adminCorner.firstTabY(screenHeight);
-		for (AdminTab tab : adminTabs) {
+		int maxPerRow = adminMaxPerRow();
+		for (int i = 0; i < adminTabs.size(); i++) {
+			int x = adminCorner.tabX(screenWidth, i, maxPerRow);
+			int y = adminCorner.tabY(screenHeight, i, maxPerRow);
 			if (mouseX >= x && mouseX < x + TAB_WIDTH && mouseY >= y && mouseY < y + TAB_HEIGHT) {
-				return tab;
+				return adminTabs.get(i);
 			}
-			x += dirX * (TAB_WIDTH + TAB_GAP);
 		}
 		return null;
 	}
@@ -422,7 +461,9 @@ public class CobbleTabsClient implements ClientModInitializer {
 	}
 
 	private static int adminToggleY() {
-		return adminCorner.toggleY(Minecraft.getInstance().getWindow().getGuiScaledHeight());
+		// El toggle se aparta tantas filas como tenga el conjunto admin (1 o 2)
+		int rows = Math.max(1, (adminTabs.size() + adminMaxPerRow() - 1) / adminMaxPerRow());
+		return adminCorner.toggleY(Minecraft.getInstance().getWindow().getGuiScaledHeight(), rows);
 	}
 
 	private static boolean adminToggleAt(double mouseX, double mouseY) {

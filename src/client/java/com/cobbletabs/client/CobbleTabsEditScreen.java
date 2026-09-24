@@ -33,6 +33,8 @@ public class CobbleTabsEditScreen extends Screen {
 	static final int ROW_H = 14;
 	/** Filas visibles de la lista (con scroll si hay más pestañas). */
 	private static final int VISIBLE_ROWS = 11;
+	/** Ancho de la zona clicable del botón ✕ de borrado rápido (al final de cada fila). */
+	private static final int DELBOX_W = 9;
 
 	// Diálogo de edición
 	// Diálogo de edición (público para el auto-test)
@@ -98,6 +100,16 @@ public class CobbleTabsEditScreen extends Screen {
 	/** true si el diálogo de edición está abierto (solo para el auto-test). */
 	boolean selftestDialogOpen() {
 		return editing != null;
+	}
+
+	/** true si la lista muestra las pestañas admin (solo para el auto-test). */
+	boolean selftestAdminMode() {
+		return adminMode;
+	}
+
+	/** X del botón ✕ de borrado rápido (solo para el auto-test). */
+	static int selftestDelBoxX() {
+		return delBoxX();
 	}
 
 	/** true = la lista muestra las pestañas admin; false = las normales. */
@@ -386,10 +398,17 @@ public class CobbleTabsEditScreen extends Screen {
 					}
 					save();
 				}
+				// La pestaña borrada ya no existe: cerramos el diálogo y volvemos a la lista
+				closeEditor();
 			}
 			minecraft.setScreen(this);
 		}, Component.translatable("cobbletabs.edit.delete_title", target.id),
 				Component.translatable("cobbletabs.edit.delete_confirm")));
+	}
+
+	/** X del botón ✕ de borrado rápido (pegado al borde derecho del panel). */
+	private static int delBoxX() {
+		return PANEL_X + PANEL_W - DELBOX_W - 4;
 	}
 
 	/** Genera un id único sin espacios a partir de un texto base. */
@@ -404,6 +423,25 @@ public class CobbleTabsEditScreen extends Screen {
 			id = clean + n++;
 		}
 		return id;
+	}
+
+	/**
+	 * Borrado rápido desde la lista (botón ✕ de la fila): misma regla que la ✕ del
+	 * diálogo. Los huecos protegidos (extras y admin integradas) se desactivan en
+	 * vez de borrarse, porque load() los volvería a añadir.
+	 */
+	private void deleteRow(int index) {
+		List<CobbleTabsConfig.TabEntry> list = currentList();
+		if (index < 0 || index >= list.size()) {
+			return;
+		}
+		CobbleTabsConfig.TabEntry target = list.get(index);
+		if (CobbleTabsConfig.isProtectedId(target.id)) {
+			target.enabled = false;
+		} else {
+			list.remove(index);
+		}
+		save();
 	}
 
 	/** Confirmación antes de restaurar todas las pestañas por defecto. */
@@ -469,9 +507,10 @@ public class CobbleTabsEditScreen extends Screen {
 			}
 			CobbleTabsConfig.TabEntry t = list.get(index);
 			int y = y0 + 20 + row * ROW_H;
+			boolean rowHovered = mouseX >= x0 + 3 && mouseX < x1 - 3 && mouseY >= y && mouseY < y + ROW_H;
 			if (index == draggingRow) {
 				graphics.fill(x0 + 3, y, x1 - 3, y + ROW_H, 0xFF2A3A5A);
-			} else if (mouseX >= x0 + 3 && mouseX < x1 - 3 && mouseY >= y && mouseY < y + ROW_H) {
+			} else if (rowHovered) {
 				graphics.fill(x0 + 3, y, x1 - 3, y + ROW_H, 0x8032323C);
 			}
 			// Icono (se puede arrastrar para reordenar)
@@ -481,13 +520,16 @@ public class CobbleTabsEditScreen extends Screen {
 			int rgb = CobbleTabsConfig.parseColor(t.color, CobbleTabsConfig.defaultColorFor(t.id));
 			int textColor = t.enabled ? (0xFF000000 | rgb) : 0xFF707078;
 			String name = t.label.isBlank() ? t.id : t.label;
-			int maxName = PANEL_W - 110;
+			int maxName = PANEL_W - 119;
 			while (font.width(name) > maxName && name.length() > 1) {
 				name = name.substring(0, name.length() - 1);
 			}
 			graphics.drawString(font, name, x0 + 26, y + 3, textColor, false);
-			// Comando a la derecha
-			graphics.drawString(font, t.command, x1 - 4 - font.width(t.command), y + 3, 0xFF808090, false);
+			// Comando a la derecha, antes del botón ✕ de borrado rápido
+			int cmdX = delBoxX() - 4 - font.width(t.command);
+			graphics.drawString(font, t.command, cmdX, y + 3, 0xFF808090, false);
+			// Botón ✕ de borrado rápido al final de la fila (rojo al pasar el ratón)
+			graphics.drawString(font, "✕", delBoxX(), y + 3, rowHovered ? 0xFFFF5555 : 0xFF903030, false);
 		}
 
 		// Indicador de scroll (alineado a la derecha de la última fila visible)
@@ -680,6 +722,11 @@ public class CobbleTabsEditScreen extends Screen {
 			}
 			int y = PANEL_Y + 20 + row * ROW_H;
 			if (mouseY >= y && mouseY < y + ROW_H && mouseX >= x0 + 3 && mouseX < x1 - 3) {
+				// ✕ al final de la fila: borrado rápido sin abrir el diálogo
+				if (mouseX >= delBoxX() - 2 && button == 0) {
+					deleteRow(index);
+					return true;
+				}
 				if (mouseX < x0 + 22 && button == 0) {
 					draggingRow = index;
 					dragStartY = mouseY;

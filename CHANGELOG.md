@@ -4,10 +4,14 @@ Todos los cambios notables de CobbleTabs se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 versionado es SemVer (`MAJOR.MINOR.PATCH`).
 
-## [No versionado]
+## [1.2.1] - 2026-09-24
 
 ### Añadido
 
+- **Borrado rápido de pestañas**: cada fila de la lista del editor tiene ahora un botón **✕** al
+  final para borrar la pestaña sin abrir el diálogo (los huecos extra y las admin integradas se
+  desactivan en vez de borrarse, igual que con la ✕ del diálogo). Al confirmar un borrado desde el
+  diálogo, este se cierra y vuelve a la lista en vez de seguir mostrando la pestaña ya borrada
 - **Editor disponible en el inventario creativo**: el botón de libro y pluma para abrir el editor
   de pestañas aparece ahora también en el inventario creativo (antes solo en survival), en la misma
   posición a la izquierda del toggle y por encima de la tira de pestañas vanilla
@@ -22,6 +26,14 @@ versionado es SemVer (`MAJOR.MINOR.PATCH`).
 
 ### Cambiado
 
+- **Pestañas por defecto renovadas**: la config nueva trae solo **2 pestañas activas**, **Menu**
+  (`/menu`, brújula, cian) y **RTP** (`/rtp`, perla de ender, verde). Las clásicas (PC, Wiki,
+  Daycare, Daily, STS y WT) siguen en la config pero **desactivadas**; en configs ya existentes no
+  se toca nada
+- **Fila admin en dos filas**: al superar **5 pestañas admin** (configurable con el nuevo campo
+  **`admin.maxPerRow`**, de 1 a 8), el resto ya no sigue apilándose hacia el centro sino que forma
+  una **segunda fila hacia el interior de la pantalla** (encima de la primera en las esquinas
+  inferiores, debajo en las superiores); el toggle admin se aparta solo para no solaparse
 - **Pantalla de presets rediseñada** a dos columnas: la izquierda lista los presets (integrados en
   cian, guardados en blanco, contador de pestañas, marcador del color al seleccionar) y la derecha
   muestra el **panel de detalles** del preset seleccionado: nombre a color, tipo, contenido completo
