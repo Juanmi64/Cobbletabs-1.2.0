@@ -13,18 +13,24 @@ repositories {
 	}
 }
 
-loom {
-	accessWidenerPath = file("src/main/resources/cobbletabs.accesswidener")
-
-	splitEnvironmentSourceSets()
-
-	mods {
-		"${modid}" {
-			sourceSet sourceSets.main
-			sourceSet sourceSets.client
+	loom {
+		accessWidenerPath = file("src/main/resources/cobbletabs.accesswidener")
+	
+		splitEnvironmentSourceSets()
+	
+		mods {
+			"${modid}" {
+				sourceSet sourceSets.main
+				sourceSet sourceSets.client
+			}
+		}
+	
+		// Los mixins viven en el source set de cliente (cobbletabs.mixins.json, declarado en fabric.mod.json)
+		mixin {
+			add sourceSets.main, "cobbletabs.refmap"
+			add sourceSets.client, "cobbletabs.refmap"
 		}
 	}
-}
 
 dependencies {
 	// To change the versions see the gradle.properties file

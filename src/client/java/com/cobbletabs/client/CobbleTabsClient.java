@@ -58,10 +58,11 @@ public class CobbleTabsClient implements ClientModInitializer {
 	/** Pestañas admin activas, en el orden de la config (fila inferior derecha de la pantalla). */
 	private static List<AdminTab> adminTabs = List.of();
 
-	private record Tab(String command, Component label, String iconId) {
+	/** Pestaña normal: el lado (left/right/top/bottom; vacío = automático) decide dónde se dibuja. */
+	private record Tab(String command, Component label, String iconId, String side) {
 	}
 
-	/** Pestaña admin: igual que una normal pero posicionada fuera de la GUI del inventario. */
+	/** Pestaña admin: igual que una normal pero posicionada en la esquina configurada de la pantalla. */
 	private record AdminTab(String command, Component label, String iconId) {
 	}
 
@@ -214,7 +215,7 @@ public class CobbleTabsClient implements ClientModInitializer {
 			int rgb = CobbleTabsConfig.parseColor(entry.color, CobbleTabsConfig.defaultColorFor(entry.id));
 			boolean bold = entry.bold;
 			Component label = base.withStyle(style -> style.withBold(bold).withColor(TextColor.fromRgb(rgb)));
-			list.add(new Tab(entry.command, label, entry.icon));
+			list.add(new Tab(entry.command, label, entry.icon, CobbleTabsConfig.normalizeSide(entry.side)));
 		}
 		tabs = List.copyOf(list);
 		adminCorner = AdminCorner.fromConfig(config.admin.corner);
@@ -237,48 +238,102 @@ public class CobbleTabsClient implements ClientModInitializer {
 
 	/** Item de un icono por id (para previsualizaciones del editor y de presets). */
 	public static ItemStack itemStackFor(String iconId) {
-		return iconStack(new Tab("", Component.empty(), iconId));
+		return iconStack(new Tab("", Component.empty(), iconId, ""));
 	}
 
 	// ==================================================================
 	// Renderizado
 	// ==================================================================
 
-/**
-	 * Cuántas pestañas caben por lado sin salirse del fondo de la GUI (2 de más
-	 * con las pestañas extra). Si no caben todas, se reparten mejor entre ambos lados.
+	/**
+	 * Pestañas activas agrupadas por lado del inventario. Las que no tienen lado
+	 * configurado (campo "side" vacío) se reparten como siempre: la mitad a la
+	 * izquierda y el resto a la derecha.
 	 */
+	private record SideTabs(List<Tab> left, List<Tab> right, List<Tab> top, List<Tab> bottom) {
+		boolean hasTopOrBottom() {
+			return !top.isEmpty() || !bottom.isEmpty();
+		}
+	}
+
+	/**
+	 * Agrupa las pestañas activas por lado según su campo "side". En cada lado se
+	 * respetan el orden de la config y el máximo que cabe sin salirse del fondo
+	 * (las que no caben no se dibujan).
+	 */
+	private static SideTabs buildSideTabs(AbstractContainerScreen<?> screen) {
+		List<Tab> left = new ArrayList<>();
+		List<Tab> right = new ArrayList<>();
+		List<Tab> top = new ArrayList<>();
+		List<Tab> bottom = new ArrayList<>();
+		List<Tab> auto = new ArrayList<>();
+		for (Tab tab : tabs) {
+			switch (tab.side()) {
+				case "left" -> left.add(tab);
+				case "right" -> right.add(tab);
+				case "top" -> top.add(tab);
+				case "bottom" -> bottom.add(tab);
+				default -> auto.add(tab); // sin lado: reparto clásico izquierda/derecha
+			}
+		}
+		// Reparto clásico (comportamiento de siempre): la primera mitad a la izquierda
+		int leftCount = Math.min((auto.size() + 1) / 2, maxPerSide(screen));
+		left.addAll(auto.subList(0, leftCount));
+		right.addAll(auto.subList(leftCount, auto.size()));
+		// Los lados horizontales se limitan al ancho de la GUI
+		int topCap = Math.min(top.size(), maxPerRowHorizontal(screen));
+		int bottomCap = Math.min(bottom.size(), maxPerRowHorizontal(screen));
+		return new SideTabs(List.copyOf(left), List.copyOf(right),
+				List.copyOf(top.subList(0, topCap)), List.copyOf(bottom.subList(0, bottomCap)));
+	}
+
+	/** Cuántas pestañas caben por lado vertical sin salirse del alto del fondo de la GUI. */
 	public static int maxPerSide(AbstractContainerScreen<?> screen) {
 		int available = screen.imageHeight - 2 * MARGIN + TAB_GAP;
 		return Math.max(1, available / (TAB_HEIGHT + TAB_GAP));
 	}
 
-	/** Pestañas que van al lado izquierdo (la mitad, sin pasarse del alto de la GUI). */
-	public static int leftCount(AbstractContainerScreen<?> screen) {
-		return Math.min((tabs.size() + 1) / 2, maxPerSide(screen));
+	/** Cuántas pestañas caben por lado horizontal sin salirse del ancho del fondo de la GUI. */
+	private static int maxPerRowHorizontal(AbstractContainerScreen<?> screen) {
+		int available = screen.imageWidth - 2 * MARGIN + TAB_GAP;
+		return Math.max(1, available / (TAB_WIDTH + TAB_GAP));
 	}
 
-	/** Pestañas en los laterales de la GUI: la mitad izquierda a la izquierda, el resto a la derecha. */
+	/** Pestañas en los 4 lados de la GUI: izquierda, derecha (laterales) y arriba, abajo (colgando del borde). */
 	private static void renderTabs(GuiGraphics graphics, AbstractContainerScreen<?> screen, int mouseX, int mouseY) {
 		Minecraft client = Minecraft.getInstance();
 		renderToggle(graphics, client, screen, mouseX, mouseY);
 		if (!config.tabsVisible) {
 			return;
 		}
-		int leftCount = leftCount(screen);
+		SideTabs grouped = buildSideTabs(screen);
 
-		// Lado izquierdo
+		// Lado izquierdo (pegado al borde, hacia fuera)
 		int y = screen.topPos + MARGIN;
-		for (int i = 0; i < leftCount; i++) {
-			renderTab(graphics, client, tabs.get(i), screen.leftPos - TAB_WIDTH + OVERLAP, y, mouseX, mouseY);
+		for (Tab tab : grouped.left()) {
+			renderTab(graphics, client, tab, screen.leftPos - TAB_WIDTH + OVERLAP, y, mouseX, mouseY);
 			y += TAB_HEIGHT + TAB_GAP;
 		}
 
-		// Lado derecho
+		// Lado derecho (pegado al borde, hacia fuera)
 		y = screen.topPos + MARGIN;
-		for (int i = leftCount; i < tabs.size(); i++) {
-			renderTab(graphics, client, tabs.get(i), screen.leftPos + screen.imageWidth - OVERLAP, y, mouseX, mouseY);
+		for (Tab tab : grouped.right()) {
+			renderTab(graphics, client, tab, screen.leftPos + screen.imageWidth - OVERLAP, y, mouseX, mouseY);
 			y += TAB_HEIGHT + TAB_GAP;
+		}
+
+		// Lado superior (colgando del borde superior, hacia fuera)
+		int x = screen.leftPos + MARGIN;
+		for (Tab tab : grouped.top()) {
+			renderTab(graphics, client, tab, x, screen.topPos - TAB_HEIGHT + OVERLAP, mouseX, mouseY);
+			x += TAB_WIDTH + TAB_GAP;
+		}
+
+		// Lado inferior (colgando del borde inferior, hacia fuera)
+		x = screen.leftPos + MARGIN;
+		for (Tab tab : grouped.bottom()) {
+			renderTab(graphics, client, tab, x, screen.topPos + screen.imageHeight - OVERLAP, mouseX, mouseY);
+			x += TAB_WIDTH + TAB_GAP;
 		}
 	}
 
@@ -376,6 +431,40 @@ public class CobbleTabsClient implements ClientModInitializer {
 		}
 	}
 
+	// ==================================================================
+	// Efectos de estado del inventario (via mixin)
+	// ==================================================================
+
+	/** Desplazamiento de la columna de efectos cuando hay pestañas en el lado derecho. */
+	public static final int EFFECTS_TABS_OFFSET = TAB_WIDTH - OVERLAP + 2;
+
+	/**
+	 * Desplazamiento horizontal que necesita la columna de efectos de estado del
+	 * inventario para no dibujarse encima de las pestañas del lado derecho.
+	 * Lo consume el mixin de EffectRenderingInventoryScreen; 0 = no hay que desplazar.
+	 */
+	public static int effectsOffsetFor(AbstractContainerScreen<?> screen) {
+		// Solo el inventario del jugador dibuja efectos (los demás ContainerScreen
+		// no muestran pestañas, y pantallas como la del caballo no dibujan efectos)
+		if (!(screen instanceof InventoryScreen) || !config.tabsVisible || tabs.isEmpty()) {
+			return 0;
+		}
+		return buildSideTabs(screen).right().isEmpty() ? 0 : EFFECTS_TABS_OFFSET;
+	}
+
+	/**
+	 * true si hay pestañas en la banda inferior del inventario: como el método
+	 * canSeeEffects() de vanilla solo mira el hueco a la derecha, con pestañas
+	 * abajo hay que ocultar los efectos para que no asomen por debajo de la fila.
+	 * Lo consume el mixin de EffectRenderingInventoryScreen.
+	 */
+	public static boolean topBottomTabsCoverEffects(AbstractContainerScreen<?> screen) {
+		if (!(screen instanceof InventoryScreen) || !config.tabsVisible || tabs.isEmpty()) {
+			return false;
+		}
+		return buildSideTabs(screen).hasTopOrBottom();
+	}
+
 	/** Esquina activa del conjunto admin (config, resuelta al construir las pestañas). */
 	private static AdminCorner adminCorner = AdminCorner.BOTTOM_RIGHT;
 
@@ -409,7 +498,7 @@ public class CobbleTabsClient implements ClientModInitializer {
 			AdminTab tab = adminTabs.get(i);
 			int x = adminCorner.tabX(screenWidth, i, maxPerRow);
 			int y = adminCorner.tabY(screenHeight, i, maxPerRow);
-			renderTab(graphics, client, new Tab(tab.command(), tab.label(), tab.iconId()), x, y, mouseX, mouseY);
+			renderTab(graphics, client, new Tab(tab.command(), tab.label(), tab.iconId(), ""), x, y, mouseX, mouseY);
 		}
 	}
 
@@ -447,7 +536,7 @@ public class CobbleTabsClient implements ClientModInitializer {
 
 		// Icono: barrera cuando se ve la fila admin (clic = ocultar), ojo de ender cuando está oculta
 		String iconId = config.admin.visible ? "minecraft:barrier" : "minecraft:ender_eye";
-		ItemStack icon = iconStack(new Tab("", Component.empty(), iconId));
+		ItemStack icon = iconStack(new Tab("", Component.empty(), iconId, ""));
 		graphics.renderItem(icon, x + 1, y + 1);
 
 		if (hovered) {
@@ -547,7 +636,7 @@ public class CobbleTabsClient implements ClientModInitializer {
 
 		// Icono: barrera cuando se ven las pestañas (clic = ocultar), ojo de ender cuando están ocultas
 		String iconId = config.tabsVisible ? "minecraft:barrier" : "minecraft:ender_eye";
-		ItemStack icon = iconStack(new Tab("", Component.empty(), iconId));
+		ItemStack icon = iconStack(new Tab("", Component.empty(), iconId, ""));
 		graphics.renderItem(icon, x + 1, y + 1);
 
 		if (hovered) {
@@ -633,26 +722,46 @@ public class CobbleTabsClient implements ClientModInitializer {
 		if (!config.tabsVisible) {
 			return null;
 		}
-		int leftCount = leftCount(screen);
+		SideTabs grouped = buildSideTabs(screen);
 
 		// Lado izquierdo
 		int y = screen.topPos + MARGIN;
-		for (int i = 0; i < leftCount; i++) {
+		for (Tab tab : grouped.left()) {
 			int x = screen.leftPos - TAB_WIDTH + OVERLAP;
 			if (mouseX >= x && mouseX < x + TAB_WIDTH && mouseY >= y && mouseY < y + TAB_HEIGHT) {
-				return tabs.get(i);
+				return tab;
 			}
 			y += TAB_HEIGHT + TAB_GAP;
 		}
 
 		// Lado derecho
 		y = screen.topPos + MARGIN;
-		for (int i = leftCount; i < tabs.size(); i++) {
+		for (Tab tab : grouped.right()) {
 			int x = screen.leftPos + screen.imageWidth - OVERLAP;
 			if (mouseX >= x && mouseX < x + TAB_WIDTH && mouseY >= y && mouseY < y + TAB_HEIGHT) {
-				return tabs.get(i);
+				return tab;
 			}
 			y += TAB_HEIGHT + TAB_GAP;
+		}
+
+		// Lado superior
+		int x = screen.leftPos + MARGIN;
+		for (Tab tab : grouped.top()) {
+			int ty = screen.topPos - TAB_HEIGHT + OVERLAP;
+			if (mouseX >= x && mouseX < x + TAB_WIDTH && mouseY >= ty && mouseY < ty + TAB_HEIGHT) {
+				return tab;
+			}
+			x += TAB_WIDTH + TAB_GAP;
+		}
+
+		// Lado inferior
+		x = screen.leftPos + MARGIN;
+		for (Tab tab : grouped.bottom()) {
+			int by = screen.topPos + screen.imageHeight - OVERLAP;
+			if (mouseX >= x && mouseX < x + TAB_WIDTH && mouseY >= by && mouseY < by + TAB_HEIGHT) {
+				return tab;
+			}
+			x += TAB_WIDTH + TAB_GAP;
 		}
 		return null;
 	}

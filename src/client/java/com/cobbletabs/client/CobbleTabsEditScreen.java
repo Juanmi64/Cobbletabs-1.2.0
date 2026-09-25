@@ -19,30 +19,50 @@ import java.util.List;
  * activarla/desactivarla y moverla entre las 4 esquinas de la pantalla.
  * Los cambios se guardan al momento en config/cobbletabs.json y se aplican
  * sin salir del inventario.
+ *
+ * <p>Rediseño 1.2.3: cada fila muestra un chip con su lado del inventario
+ * (clicable para cambiarlo al instante), la lista tiene barra de scroll y el
+ * diálogo de edición usa selectores cíclicos en vez de menús desplegables.
+ * Las pestañas admin no muestran el selector de lado: su posición la decide
+ * la esquina de la fila admin, no el campo "side".</p>
  */
 public class CobbleTabsEditScreen extends Screen {
 
 	/** Pantalla a la que volver al cerrar (normalmente el inventario). */
 	private final Screen parent;
 
-	// Panel principal (público para el auto-test)
-	static final int PANEL_X = 25;
-	static final int PANEL_W = 211;
-	static final int PANEL_Y = 18;
-	static final int PANEL_H = 214;
-	static final int ROW_H = 14;
+	// ==================================================================
+	// Geometría del panel (pública para el auto-test)
+	// ==================================================================
+	static final int PANEL_X = 28;
+	static final int PANEL_W = 264;
+	static final int PANEL_Y = 12;
+	static final int PANEL_H = 204;
+	/** Alto de cada fila de la lista. */
+	static final int ROW_H = 15;
 	/** Filas visibles de la lista (con scroll si hay más pestañas). */
-	private static final int VISIBLE_ROWS = 11;
+	private static final int VISIBLE_ROWS = 9;
+	/** Y relativa al panel donde empieza la lista. */
+	private static final int LIST_DY = 22;
 	/** Ancho de la zona clicable del botón ✕ de borrado rápido (al final de cada fila). */
-	private static final int DELBOX_W = 9;
+	private static final int DELBOX_W = 14;
+	/** Y de las dos filas de botones del pie del panel. */
+	private static final int ROW_A_Y = PANEL_Y + 164;
+	private static final int ROW_B_Y = PANEL_Y + 184;
 
-	// Diálogo de edición
-	// Diálogo de edición (público para el auto-test)
-	static final int DLG_X = 35;
-	static final int DLG_W = 181;
-	static final int DLG_Y = 26;
-	static final int DLG_H = 152;
+	// ==================================================================
+	// Geometría del diálogo de edición (pública para el auto-test)
+	// ==================================================================
+	static final int DLG_X = 32;
+	static final int DLG_W = 256;
+	static final int DLG_Y = 14;
+	static final int DLG_H = 212;
 	private static final int FIELD_H = 12;
+
+	/** Lados en el orden del ciclo del selector (vacío = automático). */
+	private static final String[] SIDE_CYCLE = { "", "left", "right", "top", "bottom" };
+	/** Esquinas en el orden del ciclo del selector de la fila admin. */
+	private static final String[] CORNER_CYCLE = { "bottom_right", "bottom_left", "top_left", "top_right" };
 
 	/** Pestaña en edición, o null si el diálogo está cerrado. */
 	private CobbleTabsConfig.TabEntry editing;
@@ -62,10 +82,23 @@ public class CobbleTabsEditScreen extends Screen {
 	private Button panelResetBtn;
 	/** Botón activar/desactivar la fila de pestañas admin. */
 	private Button adminRowBtn;
-	/** Botón que despliega el menú de esquinas de la fila admin. */
-	private Button cornerBtn;
-	/** true si el menú desplegable de esquinas está abierto. */
-	private boolean cornerMenuOpen;
+
+	/** true = la lista muestra las pestañas admin; false = las normales. */
+	private boolean adminMode;
+	/** Desplazamiento de scroll de la lista. */
+	private int scroll;
+	/** Fila arrastrada para reordenar, o -1. */
+	private int draggingRow = -1;
+	private double dragStartY;
+
+	public CobbleTabsEditScreen(Screen parent) {
+		super(Component.translatable("cobbletabs.edit.title"));
+		this.parent = parent;
+	}
+
+	// ==================================================================
+	// Accesores para el auto-test
+	// ==================================================================
 
 	/** X del panel (para el auto-test). */
 	public static int panelX() {
@@ -112,73 +145,61 @@ public class CobbleTabsEditScreen extends Screen {
 		return delBoxX();
 	}
 
-	/** true = la lista muestra las pestañas admin; false = las normales. */
-	private boolean adminMode;
-	/** Desplazamiento de scroll de la lista. */
-	private int scroll;
-	/** Fila arrastrada para reordenar, o -1. */
-	private int draggingRow = -1;
-	private double dragStartY;
-
-	public CobbleTabsEditScreen(Screen parent) {
-		super(Component.translatable("cobbletabs.edit.title"));
-		this.parent = parent;
+	/** Lado de la pestaña en edición (solo para el auto-test). */
+	String selftestEditingSide() {
+		return editing == null ? null : CobbleTabsConfig.normalizeSide(editing.side);
 	}
+
+	// ==================================================================
+	// Inicialización
+	// ==================================================================
 
 	@Override
 	protected void init() {
-		int x0 = PANEL_X;
-		int y1 = PANEL_Y + PANEL_H;
-		int fx = x0 + 4;
+		int fx = PANEL_X + 4;
 
-		// Selector de lista: Pestañas / Admins (ocultos mientras el diálogo está abierto)
+		// Fila B del pie: lista, añadir, restaurar y presets
 		panelModeBtn = Button.builder(modeLabel(), b -> {
 			adminMode = !adminMode;
 			scroll = 0;
 			b.setMessage(modeLabel());
-		}).bounds(fx, y1 - 20, 45, 16).build();
+		}).bounds(fx, ROW_B_Y, 52, 16).build();
 		addRenderableWidget(panelModeBtn);
 
 		// Añadir nueva pestaña
 		panelAddBtn = Button.builder(Component.translatable("cobbletabs.edit.add"), b -> openEditor(null, -1))
-				.bounds(fx + 47, y1 - 20, 42, 16).build();
+				.bounds(fx + 54, ROW_B_Y, 65, 16).build();
 		addRenderableWidget(panelAddBtn);
 
 		// Restaurar pestañas por defecto
 		panelResetBtn = Button.builder(Component.translatable("cobbletabs.edit.reset"), b -> confirmReset())
-				.bounds(fx + 91, y1 - 20, 58, 16).build();
+				.bounds(fx + 121, ROW_B_Y, 64, 16).build();
 		addRenderableWidget(panelResetBtn);
 
-		// Opciones de la fila admin: activarla y elegir esquina (segunda fila de botones)
+		// Pantalla de presets
+		addRenderableWidget(Button.builder(Component.translatable("cobbletabs.edit.presets"),
+						b -> minecraft.setScreen(new CobbleTabsPresetsScreen(this)))
+				.bounds(fx + 187, ROW_B_Y, 72, 16).build());
+
+		// Fila A del pie: activar/desactivar la fila admin (la esquina es un chip propio)
 		adminRowBtn = Button.builder(adminRowLabel(), b -> toggleAdminRow())
-				.bounds(fx, y1 - 40, 66, 16)
+				.bounds(fx, ROW_A_Y, 78, 16)
 				.tooltip(Tooltip.create(Component.translatable("cobbletabs.edit.admin_row.tip")))
 				.build();
 		addRenderableWidget(adminRowBtn);
 
-		cornerBtn = Button.builder(cornerLabel(), b -> cornerMenuOpen = !cornerMenuOpen)
-				.bounds(fx + CORNER_BTN_DX, y1 - CORNER_BTN_DY, MENU_W, 16)
-				.tooltip(Tooltip.create(Component.translatable("cobbletabs.edit.corner.tip")))
-				.build();
-		addRenderableWidget(cornerBtn);
-
-		// Pantalla de presets (siempre disponible)
-		addRenderableWidget(Button.builder(Component.translatable("cobbletabs.edit.presets"),
-						b -> minecraft.setScreen(new CobbleTabsPresetsScreen(this)))
-				.bounds(fx + 148, y1 - 40, 55, 16).build());
-
 		// Campos del diálogo de edición (ocultos hasta abrirlo)
-		commandBox = new EditBox(font, DLG_X + 6, DLG_Y + 25, DLG_W - 12, FIELD_H, Component.translatable("cobbletabs.edit.command"));
+		commandBox = new EditBox(font, DLG_X + 8, DLG_Y + 30, DLG_W - 16, FIELD_H, Component.translatable("cobbletabs.edit.command"));
 		commandBox.setMaxLength(256);
 		commandBox.setHint(Component.literal("/comando"));
-		iconBox = new EditBox(font, DLG_X + 6, DLG_Y + 47, DLG_W - 34, FIELD_H, Component.translatable("cobbletabs.edit.icon"));
+		iconBox = new EditBox(font, DLG_X + 8, DLG_Y + 56, 200, FIELD_H, Component.translatable("cobbletabs.edit.icon"));
 		iconBox.setMaxLength(256);
 		iconBox.setHint(Component.literal("minecraft:paper"));
-		labelBox = new EditBox(font, DLG_X + 6, DLG_Y + 69, DLG_W - 12, FIELD_H, Component.translatable("cobbletabs.edit.label"));
+		labelBox = new EditBox(font, DLG_X + 8, DLG_Y + 82, DLG_W - 16, FIELD_H, Component.translatable("cobbletabs.edit.label"));
 		labelBox.setMaxLength(64);
 		labelBox.setHint(Component.literal("Nombre"));
 		// Color libre: nombre de paleta (gray, green…) o RGB hex #RRGGBB
-		colorBox = new EditBox(font, DLG_X + 6, DLG_Y + 91, 80, FIELD_H, Component.translatable("cobbletabs.edit.color"));
+		colorBox = new EditBox(font, DLG_X + 8, DLG_Y + 108, 132, FIELD_H, Component.translatable("cobbletabs.edit.color"));
 		colorBox.setMaxLength(16);
 		colorBox.setHint(Component.literal("#RRGGBB"));
 		commandBox.setVisible(false);
@@ -226,18 +247,15 @@ public class CobbleTabsEditScreen extends Screen {
 			// Al activar, enciende también las pestañas admin integradas para que se vea algo
 			cfg.enableDefaultAdminTabs();
 		}
-		rebuildAdminButtons();
+		if (adminRowBtn != null) {
+			adminRowBtn.setMessage(adminRowLabel());
+		}
 	}
 
-	/** Esquinas del menú desplegable, en el orden en que se muestran. */
-	private static final String[] CORNER_KEYS = { "top_left", "top_right", "bottom_left", "bottom_right" };
-	/** Ancho del menú desplegable de esquinas (igual que el botón que lo abre). */
-	private static final int MENU_W = 78;
-	/** Alto de cada opción del menú desplegable. */
-	private static final int MENU_ITEM_H = 12;
-	/** Posición del botón de esquina dentro de la segunda fila de botones. */
-	private static final int CORNER_BTN_DX = 68;
-	private static final int CORNER_BTN_DY = 40;
+	/** X del chip de esquina de la fila admin (junto al botón "Fila admin"). */
+	private static int cornerChipX() {
+		return PANEL_X + 86;
+	}
 
 	/** Aplica una esquina a la fila admin y guarda al instante. */
 	private void applyCorner(String corner) {
@@ -245,19 +263,9 @@ public class CobbleTabsEditScreen extends Screen {
 		cfg.admin.corner = CobbleTabsConfig.normalizeCorner(corner);
 		CobbleTabsConfig.save(cfg);
 		CobbleTabsClient.rebuildTabs();
-		if (cornerBtn != null) {
-			cornerBtn.setMessage(cornerLabel());
-		}
 	}
 
-	/** Refresca la etiqueta del botón de fila admin tras un cambio. */
-	private void rebuildAdminButtons() {
-		if (adminRowBtn != null) {
-			adminRowBtn.setMessage(adminRowLabel());
-		}
-	}
-
-	/** Etiqueta del botón de esquina: el nombre corto de la esquina activa de la fila admin. */
+	/** Etiqueta del chip de esquina: el nombre de la esquina activa de la fila admin. */
 	private Component cornerLabel() {
 		String corner = CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner);
 		String key = switch (corner) {
@@ -269,49 +277,71 @@ public class CobbleTabsEditScreen extends Screen {
 		return Component.translatable(key);
 	}
 
-	/** X del menú desplegable: alineado con el botón que lo abre. */
-	private static int cornerMenuX() {
-		return PANEL_X + 4 + CORNER_BTN_DX;
+	// ==================================================================
+	// Selector cíclico de lado (diálogo de edición)
+	// ==================================================================
+
+	/**
+	 * Y de la fila de chips de negrita/activada dentro del diálogo: en las
+	 * pestañas admin sube 16 px porque no hay selector de lado.
+	 */
+	private int togglesY() {
+		return adminMode ? DLG_Y + 128 : DLG_Y + 144;
 	}
 
-	/** Y del menú desplegable: se abre hacia arriba desde el borde superior del botón. */
-	private static int cornerMenuY() {
-		return PANEL_Y + PANEL_H - CORNER_BTN_DY - CORNER_KEYS.length * MENU_ITEM_H;
+	/** Y de la fila de swatches de color (también sube en admin). */
+	private int paletteY() {
+		return adminMode ? DLG_Y + 146 : DLG_Y + 162;
 	}
 
-	/** Y del centro de la opción i del menú de esquinas (para el auto-test). */
-	static int cornerMenuItemY(int index) {
-		return cornerMenuY() + index * MENU_ITEM_H + MENU_ITEM_H / 2;
+	/** Región del chip de lado dentro del diálogo (oculto en admin). */
+	private static int sideChipX() {
+		return DLG_X + 8;
 	}
 
-	/** true si el menú desplegable de esquinas está abierto (solo para el auto-test). */
-	boolean selftestCornerMenuOpen() {
-		return cornerMenuOpen;
+	private static int sideChipY() {
+		return DLG_Y + 126;
 	}
 
-	/** Dibuja el menú desplegable con las 4 esquinas (la activa resaltada en cian). */
-	private void renderCornerMenu(GuiGraphics graphics, int mouseX, int mouseY) {
-		int x = cornerMenuX();
-		int y = cornerMenuY();
-		int h = CORNER_KEYS.length * MENU_ITEM_H;
-		graphics.fill(x, y, x + MENU_W, y + h, 0xF01C1C24);
-		int border = 0xFF7A7A88;
-		graphics.fill(x, y, x + MENU_W, y + 1, border);
-		graphics.fill(x, y, x + 1, y + h, border);
-		graphics.fill(x + MENU_W - 1, y, x + MENU_W, y + h, border);
-		graphics.fill(x, y + h - 1, x + MENU_W, y + h, border);
-
-		String current = CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner);
-		for (int i = 0; i < CORNER_KEYS.length; i++) {
-			int iy = y + i * MENU_ITEM_H;
-			boolean hovered = mouseX >= x && mouseX < x + MENU_W && mouseY >= iy && mouseY < iy + MENU_ITEM_H;
-			if (hovered) {
-				graphics.fill(x + 1, iy, x + MENU_W - 1, iy + MENU_ITEM_H, 0x80404A5A);
-			}
-			Component label = Component.translatable("cobbletabs.edit.corner." + CORNER_KEYS[i]);
-			int color = CORNER_KEYS[i].equals(current) ? 0xFF55FFFF : 0xFFE0E0E8;
-			graphics.drawString(font, label, x + 4, iy + 2, color, false);
+	/** Avanza al siguiente lado del ciclo y actualiza la pestaña en edición. */
+	private void cycleSide() {
+		if (editing == null) {
+			return;
 		}
+		String current = CobbleTabsConfig.normalizeSide(editing.side);
+		int idx = 0;
+		for (int i = 0; i < SIDE_CYCLE.length; i++) {
+			if (SIDE_CYCLE[i].equals(current)) {
+				idx = i;
+				break;
+			}
+		}
+		editing.side = CobbleTabsConfig.normalizeSide(SIDE_CYCLE[(idx + 1) % SIDE_CYCLE.length]);
+	}
+
+	/** Etiqueta completa del chip de lado: "Lado: <nombre>". */
+	private Component sideChipLabel() {
+		String side = editing == null ? "" : CobbleTabsConfig.normalizeSide(editing.side);
+		String key = switch (side) {
+			case "left" -> "cobbletabs.edit.side.left";
+			case "right" -> "cobbletabs.edit.side.right";
+			case "top" -> "cobbletabs.edit.side.top";
+			case "bottom" -> "cobbletabs.edit.side.bottom";
+			default -> "cobbletabs.edit.side.auto";
+		};
+		return Component.translatable("cobbletabs.edit.side.chip", Component.translatable(key));
+	}
+
+	/** Etiqueta corta del lado de una pestaña (para el chip de cada fila de la lista). */
+	private static Component sideShortLabel(String side) {
+		String key = switch (CobbleTabsConfig.normalizeSide(side)) {
+			case "left" -> "cobbletabs.edit.side.short.left";
+			case "right" -> "cobbletabs.edit.side.short.right";
+			case "top" -> "cobbletabs.edit.side.short.top";
+			case "bottom" -> "cobbletabs.edit.side.short.bottom";
+			default -> "cobbletabs.edit.side.short.auto";
+		};
+		return Component.translatable(key);
 	}
 
 	// ==================================================================
@@ -322,7 +352,6 @@ public class CobbleTabsEditScreen extends Screen {
 	private void openEditor(CobbleTabsConfig.TabEntry entry, int index) {
 		editing = entry == null ? new CobbleTabsConfig.TabEntry() : entry;
 		editingIndex = index;
-		cornerMenuOpen = false;
 		commandBox.setVisible(true);
 		iconBox.setVisible(true);
 		labelBox.setVisible(true);
@@ -336,7 +365,6 @@ public class CobbleTabsEditScreen extends Screen {
 		panelAddBtn.visible = false;
 		panelResetBtn.visible = false;
 		adminRowBtn.visible = false;
-		cornerBtn.visible = false;
 	}
 
 	private void closeEditor() {
@@ -351,7 +379,6 @@ public class CobbleTabsEditScreen extends Screen {
 		panelAddBtn.visible = true;
 		panelResetBtn.visible = true;
 		adminRowBtn.visible = true;
-		cornerBtn.visible = true;
 	}
 
 	/** Guarda el diálogo: nueva pestaña o cambios sobre la existente. */
@@ -364,6 +391,10 @@ public class CobbleTabsEditScreen extends Screen {
 		editing.label = labelBox.getValue();
 		// Color libre: acepta nombre de paleta o hex #RRGGBB (vacío = color por defecto)
 		editing.color = colorBox.getValue().trim();
+		// Las admin se colocan solas en la esquina de la fila: el campo "side" no les aplica
+		if (adminMode) {
+			editing.side = "";
+		}
 		CobbleTabsConfig.sanitizeEntry(editing);
 		if (editing.command.isBlank()) {
 			editing.command = "/desconocido";
@@ -471,12 +502,8 @@ public class CobbleTabsEditScreen extends Screen {
 
 		if (editing == null) {
 			renderPanel(graphics, mouseX, mouseY);
-			// Menú de esquinas: capa superior, sobre la lista
-			if (cornerMenuOpen) {
-				renderCornerMenu(graphics, mouseX, mouseY);
-			}
 		} else {
-			// Capa superior del diálogo: bordes, títulos, swatches y botones de texto
+			// Capa superior del diálogo: bordes, títulos, chips, swatches y botones de texto
 			renderDialogOverlay(graphics, mouseX, mouseY);
 		}
 	}
@@ -487,6 +514,7 @@ public class CobbleTabsEditScreen extends Screen {
 		int x1 = PANEL_X + PANEL_W;
 		int y0 = PANEL_Y;
 		int y1 = PANEL_Y + PANEL_H;
+		int listY = y0 + LIST_DY;
 
 		graphics.fill(x0, y0, x1, y1, 0xE0101018);
 		int border = 0xFF4A4A55;
@@ -506,7 +534,7 @@ public class CobbleTabsEditScreen extends Screen {
 				break;
 			}
 			CobbleTabsConfig.TabEntry t = list.get(index);
-			int y = y0 + 20 + row * ROW_H;
+			int y = listY + row * ROW_H;
 			boolean rowHovered = mouseX >= x0 + 3 && mouseX < x1 - 3 && mouseY >= y && mouseY < y + ROW_H;
 			if (index == draggingRow) {
 				graphics.fill(x0 + 3, y, x1 - 3, y + ROW_H, 0xFF2A3A5A);
@@ -515,37 +543,69 @@ public class CobbleTabsEditScreen extends Screen {
 			}
 			// Icono (se puede arrastrar para reordenar)
 			ItemStack icon = CobbleTabsClient.itemStackFor(t.icon);
-			graphics.renderItem(icon, x0 + 5, y - 1);
-			// Nombre + color de la pestaña, tachado si está desactivada
+			graphics.renderItem(icon, x0 + 5, y);
+			// Nombre + color de la pestaña, tachado (gris) si está desactivada
 			int rgb = CobbleTabsConfig.parseColor(t.color, CobbleTabsConfig.defaultColorFor(t.id));
 			int textColor = t.enabled ? (0xFF000000 | rgb) : 0xFF707078;
 			String name = t.label.isBlank() ? t.id : t.label;
-			int maxName = PANEL_W - 119;
+			int maxName = 92;
 			while (font.width(name) > maxName && name.length() > 1) {
 				name = name.substring(0, name.length() - 1);
 			}
-			graphics.drawString(font, name, x0 + 26, y + 3, textColor, false);
+			graphics.drawString(font, name, x0 + 24, y + 4, textColor, false);
+			// Chip con el lado del inventario (solo pestañas normales: las admin van a la esquina de su fila)
+			if (!adminMode) {
+				String side = CobbleTabsConfig.normalizeSide(t.side);
+				boolean fixed = !side.isEmpty();
+				int cx = x0 + 118;
+				int cy = y + 2;
+				graphics.fill(cx, cy, cx + 44, cy + 11, 0xFF1E1E28);
+				int chipBorder = fixed ? 0xFF2E6E70 : 0xFF3A3A46;
+				graphics.fill(cx, cy, cx + 44, cy + 1, chipBorder);
+				graphics.fill(cx, cy + 10, cx + 44, cy + 11, chipBorder);
+				graphics.fill(cx, cy, cx + 1, cy + 11, chipBorder);
+				graphics.fill(cx + 43, cy, cx + 44, cy + 11, chipBorder);
+				Component shortSide = sideShortLabel(t.side);
+				graphics.drawString(font, shortSide, cx + 4, cy + 2, fixed ? 0xFF7ADCDE : 0xFF9A9AA8, false);
+			}
 			// Comando a la derecha, antes del botón ✕ de borrado rápido
 			int cmdX = delBoxX() - 4 - font.width(t.command);
-			graphics.drawString(font, t.command, cmdX, y + 3, 0xFF808090, false);
+			graphics.drawString(font, t.command, cmdX, y + 4, 0xFF6A6A78, false);
 			// Botón ✕ de borrado rápido al final de la fila (rojo al pasar el ratón)
-			graphics.drawString(font, "✕", delBoxX(), y + 3, rowHovered ? 0xFFFF5555 : 0xFF903030, false);
+			graphics.drawString(font, "✕", delBoxX() + 3, y + 4, rowHovered ? 0xFFFF5555 : 0xFF903030, false);
 		}
 
-		// Indicador de scroll (alineado a la derecha de la última fila visible)
+		// Barra de scroll (cuando la lista no cabe entera)
 		if (maxScroll > 0) {
-			Component scrollHint = Component.translatable("cobbletabs.edit.scroll_hint");
-			graphics.drawString(font, scrollHint, x1 - 4 - font.width(scrollHint), y1 - 49, 0xFF707078, false);
+			int trackY = listY;
+			int trackH = VISIBLE_ROWS * ROW_H;
+			graphics.fill(x1 - 3, trackY, x1 - 1, trackY + trackH, 0xFF23232C);
+			int thumbH = Math.max(12, trackH * VISIBLE_ROWS / list.size());
+			int thumbY = trackY + (trackH - thumbH) * scroll / maxScroll;
+			graphics.fill(x1 - 3, thumbY, x1 - 1, thumbY + thumbH, 0xFF4A4A55);
 		}
 
 		// Título del panel + modo y nº de pestañas a la derecha
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.title"), x0 + 4, y0 + 6, 0xFF55FFFF, true);
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.title"), x0 + 4, y0 + 5, 0xFF55FFFF, true);
 		Component mode = modeLabel().copy().append(Component.literal(" (" + list.size() + ")"));
-		graphics.drawString(font, mode, x1 - 4 - font.width(mode), y0 + 6, 0xFFFFFF, true);
+		graphics.drawString(font, mode, x1 - 4 - font.width(mode), y0 + 5, 0xFFFFFF, true);
 
-		// Hint del hueco seleccionado (solo lista de pestañas normales)
-		if (!adminMode && list.isEmpty()) {
-			graphics.drawString(font, Component.translatable("cobbletabs.edit.empty"), x0 + 4, y0 + 26, 0xFF808090, false);
+		// Separador bajo la cabecera
+		graphics.fill(x0 + 1, y0 + 18, x1 - 1, y0 + 19, 0xFF33333E);
+
+		// Chip de esquina de la fila admin (junto al botón "Fila admin" del pie)
+		boolean chipHovered = mouseX >= cornerChipX() && mouseX < cornerChipX() + 64
+				&& mouseY >= ROW_A_Y && mouseY < ROW_A_Y + 16;
+		boolean adminOn = CobbleTabsClient.config().admin.enabled;
+		renderChip(graphics, cornerChipX(), ROW_A_Y, 64, 16, cornerLabel(),
+				adminOn ? 0xFF7ADCDE : 0xFF9A9AA8, chipHovered ? 0xFF7ADCDE : 0xFF3A3A46);
+		if (chipHovered) {
+			graphics.renderTooltip(font, Component.translatable("cobbletabs.edit.corner.tip"), mouseX, mouseY);
+		}
+
+		// Hint del hueco seleccionado (lista vacía)
+		if (list.isEmpty()) {
+			graphics.drawString(font, Component.translatable("cobbletabs.edit.empty"), x0 + 6, listY + 10, 0xFF808090, false);
 		}
 	}
 
@@ -555,7 +615,7 @@ public class CobbleTabsEditScreen extends Screen {
 	}
 
 	/**
-	 * Capa superior del diálogo: bordes, títulos, swatches y botones de texto.
+	 * Capa superior del diálogo: bordes, títulos, chips, swatches y botones de texto.
 	 * Se dibuja después de super.render para que no quede tapada por los campos.
 	 */
 	private void renderDialogOverlay(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -563,6 +623,7 @@ public class CobbleTabsEditScreen extends Screen {
 		int x1 = DLG_X + DLG_W;
 		int y0 = DLG_Y;
 		int y1 = DLG_Y + DLG_H;
+		int lx = x0 + 8;
 
 		int border = editingIndex >= 0 ? 0xFF7A7A88 : 0xFF9FBF7F;
 		graphics.fill(x0, y0, x1, y0 + 1, border);
@@ -571,44 +632,72 @@ public class CobbleTabsEditScreen extends Screen {
 		graphics.fill(x0, y1 - 1, x1, y1, border);
 
 		String title = editingIndex >= 0 ? editing.id : Component.translatable("cobbletabs.edit.new").getString();
-		graphics.drawString(font, title, x0 + 6, y0 + 5, 0xFFFFA0, true);
+		graphics.drawString(font, title, lx, y0 + 5, 0xFFFFA0, true);
 
 		// ✕ = borrar la pestaña en edición (solo si ya existe)
 		if (editingIndex >= 0) {
-			graphics.drawString(font, "✕", x1 - 11, y0 + 5, 0xFFFF5555, true);
+			boolean delHovered = mouseX >= x1 - 22 && mouseX < x1 - 6 && mouseY >= y0 + 2 && mouseY < y0 + 18;
+			graphics.drawString(font, "✕", x1 - 17, y0 + 5, delHovered ? 0xFFFF5555 : 0xFFB05050, true);
 		}
 
-		// Toggles de negrita y activada (botones de texto)
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.bold"), x0 + 6, y0 + 121,
-				editing.bold ? 0xFFFFFF : 0xFF707078, true);
-		graphics.drawString(font, enabledLabel(), x0 + 24, y0 + 121,
-				editing.enabled ? 0x55FF55 : 0xFF5555, true);
+		// Separador bajo el título
+		graphics.fill(x0 + 1, y0 + 17, x1 - 1, y0 + 18, 0xFF33333E);
 
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.command"), x0 + 6, y0 + 17, 0xFFA0A0B0, false);
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.icon"), x0 + 6, y0 + 39, 0xFFA0A0B0, false);
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.label"), x0 + 6, y0 + 61, 0xFFA0A0B0, false);
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.color"), x0 + 6, y0 + 83, 0xFFA0A0B0, false);
+		// Etiquetas de los campos (encima de cada caja de texto)
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.command"), lx, y0 + 22, 0xFFA0A0B0, false);
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.icon"), lx, y0 + 48, 0xFFA0A0B0, false);
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.label"), lx, y0 + 74, 0xFFA0A0B0, false);
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.color"), lx, y0 + 100, 0xFFA0A0B0, false);
 
 		// Previsualización del icono
-		graphics.renderItem(CobbleTabsClient.itemStackFor(iconBox.getValue()), x1 - 22, y0 + 42);
+		graphics.renderItem(CobbleTabsClient.itemStackFor(iconBox.getValue()), x1 - 26, y0 + 52);
+
+		// Chip de lado (oculto en las pestañas admin: su posición la marca la fila admin)
+		if (!adminMode) {
+			boolean sideHovered = mouseX >= sideChipX() && mouseX < sideChipX() + 92
+					&& mouseY >= sideChipY() && mouseY < sideChipY() + 14;
+			String side = CobbleTabsConfig.normalizeSide(editing.side);
+			renderChip(graphics, sideChipX(), sideChipY(), 92, 14, sideChipLabel(),
+					side.isEmpty() ? 0xFFE0E0E8 : 0xFF7ADCDE, sideHovered ? 0xFF55FFFF : 0xFF3A3A46);
+			graphics.drawString(font, Component.translatable("cobbletabs.edit.side.cycle_hint"),
+					sideChipX() + 98, sideChipY() + 3, 0xFF707078, false);
+			if (sideHovered) {
+				graphics.renderTooltip(font, Component.translatable("cobbletabs.edit.side.tip"), mouseX, mouseY);
+			}
+		}
+
+		// Chips de negrita y activada
+		int ty = togglesY();
+		boolean boldHovered = mouseX >= lx && mouseX < lx + 26 && mouseY >= ty && mouseY < ty + 14;
+		boolean onHovered = mouseX >= lx + 30 && mouseX < lx + 64 && mouseY >= ty && mouseY < ty + 14;
+		renderChip(graphics, lx, ty, 26, 14, Component.translatable("cobbletabs.edit.bold"),
+				editing.bold ? 0xFFFFFF : 0xFF707078, editing.bold ? 0xFF9A9AB0 : 0xFF3A3A46);
+		renderChip(graphics, lx + 30, ty, 34, 14, enabledLabel(),
+				editing.enabled ? 0x55FF55 : 0xFF5555, editing.enabled ? 0xFF3F8F3F : 0xFF8F3F3F);
+		if (boldHovered) {
+			graphics.renderTooltip(font, Component.translatable("cobbletabs.edit.bold.tip"), mouseX, mouseY);
+		}
+		if (onHovered) {
+			graphics.renderTooltip(font, Component.translatable("cobbletabs.edit.enabled.tip"), mouseX, mouseY);
+		}
 
 		// Swatches de color rápido (índice 0 = "sin color": usa el color clásico de la pestaña)
+		int py = paletteY();
 		int selIdx = CobbleTabsConfig.paletteIndexOf(editing.color);
 		for (int i = 0; i < CobbleTabsConfig.PALETTE.size(); i++) {
 			int sx = swatchX(i);
-			int sy = y0 + 103;
 			CobbleTabsConfig.PaletteEntry e = CobbleTabsConfig.PALETTE.get(i);
 			int rgb = 0xFF000000 | Integer.parseInt(e.hex().substring(1), 16);
 			boolean selected = i == selIdx;
-			graphics.fill(sx, sy, sx + 12, sy + 12, selected ? 0xFFFFFFFF : rgb);
+			graphics.fill(sx, py, sx + 13, py + 13, selected ? 0xFFFFFFFF : rgb);
 			if (selected) {
-				graphics.fill(sx + 1, sy + 1, sx + 11, sy + 11, rgb);
+				graphics.fill(sx + 1, py + 1, sx + 12, py + 12, rgb);
 			}
 			if (i == 0) {
 				// Raya diagonal gris en el swatch "sin color"
-				graphics.fill(sx + 2, sy + 9, sx + 10, sy + 10, 0xFFA0A0B0);
-				graphics.fill(sx + 4, sy + 7, sx + 8, sy + 8, 0xFFA0A0B0);
-				graphics.fill(sx + 6, sy + 5, sx + 7, sy + 6, 0xFFA0A0B0);
+				graphics.fill(sx + 2, py + 10, sx + 11, py + 11, 0xFFA0A0B0);
+				graphics.fill(sx + 4, py + 8, sx + 9, py + 9, 0xFFA0A0B0);
+				graphics.fill(sx + 6, py + 6, sx + 8, py + 7, 0xFFA0A0B0);
 			}
 		}
 
@@ -617,18 +706,39 @@ public class CobbleTabsEditScreen extends Screen {
 		if (!typed.isBlank()) {
 			int preview = CobbleTabsConfig.parseColor(typed, -1);
 			if (preview >= 0) {
-				int pvX = swatchX(CobbleTabsConfig.PALETTE.size()) + 2;
-				graphics.fill(pvX, y0 + 103, pvX + 12, y0 + 115, 0xFF000000 | preview);
-				graphics.fill(pvX, y0 + 103, pvX + 12, y0 + 104, 0xFF4A4A55);
-				graphics.fill(pvX, y0 + 114, pvX + 12, y0 + 115, 0xFF4A4A55);
-				graphics.fill(pvX, y0 + 103, pvX + 1, y0 + 115, 0xFF4A4A55);
-				graphics.fill(pvX + 11, y0 + 103, pvX + 12, y0 + 115, 0xFF4A4A55);
+				int pvX = swatchX(CobbleTabsConfig.PALETTE.size()) + 1;
+				graphics.fill(pvX, py, pvX + 13, py + 13, 0xFF000000 | preview);
+				graphics.fill(pvX, py, pvX + 13, py + 1, 0xFF4A4A55);
+				graphics.fill(pvX, py + 12, pvX + 13, py + 13, 0xFF4A4A55);
+				graphics.fill(pvX, py, pvX + 1, py + 13, 0xFF4A4A55);
+				graphics.fill(pvX + 12, py, pvX + 13, py + 13, 0xFF4A4A55);
 			}
 		}
 
-		// Guardar / Cancelar (botones de texto)
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.save"), x0 + 6, y1 - 10, 0xFF7FE37F, true);
-		graphics.drawString(font, Component.translatable("cobbletabs.edit.cancel"), x0 + 90, y1 - 10, 0xFFE37F7F, true);
+		// Separador del pie + Guardar / Cancelar (botones de texto)
+		graphics.fill(x0 + 1, y1 - 24, x1 - 1, y1 - 23, 0xFF33333E);
+		boolean saveHovered = mouseX >= lx && mouseX < lx + 110 && mouseY >= y1 - 20 && mouseY < y1 - 6;
+		boolean cancelHovered = mouseX >= lx + 120 && mouseX < x1 - 8 && mouseY >= y1 - 20 && mouseY < y1 - 6;
+		if (saveHovered) {
+			graphics.fill(lx - 2, y1 - 21, lx + 112, y1 - 5, 0x40204020);
+		}
+		if (cancelHovered) {
+			graphics.fill(lx + 118, y1 - 21, x1 - 6, y1 - 5, 0x40402020);
+		}
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.save"), lx, y1 - 17,
+				saveHovered ? 0xFFB8FFB8 : 0xFF7FE37F, true);
+		graphics.drawString(font, Component.translatable("cobbletabs.edit.cancel"), lx + 120, y1 - 17,
+				cancelHovered ? 0xFFFFB8B8 : 0xFFE37F7F, true);
+	}
+
+	/** Chip plano con borde y texto: control compacto reutilizable. */
+	private void renderChip(GuiGraphics graphics, int x, int y, int w, int h, Component text, int textColor, int borderColor) {
+		graphics.fill(x, y, x + w, y + h, 0xFF22222C);
+		graphics.fill(x, y, x + w, y + 1, borderColor);
+		graphics.fill(x, y + h - 1, x + w, y + h, borderColor);
+		graphics.fill(x, y, x + 1, y + h, borderColor);
+		graphics.fill(x + w - 1, y, x + w, y + h, borderColor);
+		graphics.drawString(font, text, x + 4, y + (h - 8) / 2, textColor, false);
 	}
 
 	private Component enabledLabel() {
@@ -637,7 +747,7 @@ public class CobbleTabsEditScreen extends Screen {
 
 	/** X del swatch de color i. */
 	private int swatchX(int i) {
-		return DLG_X + 6 + i * 14;
+		return DLG_X + 8 + i * 15;
 	}
 
 	// ==================================================================
@@ -656,15 +766,34 @@ public class CobbleTabsEditScreen extends Screen {
 			int dy1 = DLG_Y + DLG_H;
 
 			// ✕ = borrar la pestaña en edición (con confirmación)
-			if (editingIndex >= 0 && mouseY >= dy0 && mouseY < dy0 + 14 && mouseX >= dx1 - 16 && mouseX < dx1 - 2) {
+			if (editingIndex >= 0 && mouseY >= dy0 + 2 && mouseY < dy0 + 18 && mouseX >= dx1 - 22 && mouseX < dx1 - 6) {
 				confirmDelete();
 				return true;
 			}
+			// Chip de lado: cicla Automático → Izquierda → Derecha → Arriba → Abajo (oculto en admin)
+			if (!adminMode && mouseX >= sideChipX() && mouseX < sideChipX() + 92
+					&& mouseY >= sideChipY() && mouseY < sideChipY() + 14) {
+				cycleSide();
+				return true;
+			}
+			// Chips de negrita y activada
+			int ty = togglesY();
+			if (mouseY >= ty && mouseY < ty + 14) {
+				if (mouseX >= DLG_X + 8 && mouseX < DLG_X + 34) {
+					editing.bold = !editing.bold;
+					return true;
+				}
+				if (mouseX >= DLG_X + 38 && mouseX < DLG_X + 72) {
+					editing.enabled = !editing.enabled;
+					return true;
+				}
+			}
 			// Swatches de color (índice 0 = "sin color": pone el color vacío)
-			if (mouseY >= dy0 + 103 && mouseY < dy0 + 115) {
+			int py = paletteY();
+			if (mouseY >= py && mouseY < py + 13) {
 				for (int i = 0; i < CobbleTabsConfig.PALETTE.size(); i++) {
 					int sx = swatchX(i);
-					if (mouseX >= sx && mouseX < sx + 12) {
+					if (mouseX >= sx && mouseX < sx + 13) {
 						CobbleTabsConfig.PaletteEntry e = CobbleTabsConfig.PALETTE.get(i);
 						editing.color = e.key() == null ? "" : e.key();
 						colorBox.setValue(editing.color);
@@ -672,29 +801,18 @@ public class CobbleTabsEditScreen extends Screen {
 					}
 				}
 			}
-			// Toggles de negrita y activada
-			if (mouseY >= dy0 + 118 && mouseY < dy0 + 130) {
-				if (mouseX >= dx0 + 4 && mouseX < dx0 + 22) {
-					editing.bold = !editing.bold;
-					return true;
-				}
-				if (mouseX >= dx0 + 22 && mouseX < dx0 + 60) {
-					editing.enabled = !editing.enabled;
-					return true;
-				}
-			}
 			// Guardar / Cancelar (botones de texto del pie del diálogo)
-			if (mouseY >= dy1 - 14 && mouseY < dy1 - 2) {
-				if (mouseX >= dx0 + 4 && mouseX < dx0 + 86) {
+			if (mouseY >= dy1 - 20 && mouseY < dy1 - 6) {
+				if (mouseX >= dx0 + 8 && mouseX < dx0 + 118) {
 					commitEditor();
 					return true;
 				}
-				if (mouseX >= dx0 + 88 && mouseX < dx0 + 170) {
+				if (mouseX >= dx0 + 128 && mouseX < dx1 - 8) {
 					closeEditor();
 					return true;
 				}
 			}
-			// Clic fuera del diálogo: lo cierra sin guardar si venía de una fila nueva
+			// Clic fuera del diálogo: lo cierra sin guardar
 			if (mouseX < dx0 || mouseX > dx1 || mouseY < dy0 || mouseY > dy1) {
 				closeEditor();
 				return true;
@@ -702,32 +820,51 @@ public class CobbleTabsEditScreen extends Screen {
 			return super.mouseClicked(mouseX, mouseY, button);
 		}
 
-		// Menú de esquinas abierto: el clic elige una opción o cierra el menú
-		if (cornerMenuOpen) {
-			int mx = cornerMenuX();
-			int my = cornerMenuY();
-			if (mouseX >= mx && mouseX < mx + MENU_W && mouseY >= my && mouseY < my + CORNER_KEYS.length * MENU_ITEM_H) {
-				applyCorner(CORNER_KEYS[(int) ((mouseY - my) / MENU_ITEM_H)]);
+		// Chip de esquina de la fila admin: cicla entre las 4 esquinas al instante
+		if (mouseX >= cornerChipX() && mouseX < cornerChipX() + 64 && mouseY >= ROW_A_Y && mouseY < ROW_A_Y + 16) {
+			String current = CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner);
+			int idx = 0;
+			for (int i = 0; i < CORNER_CYCLE.length; i++) {
+				if (CORNER_CYCLE[i].equals(current)) {
+					idx = i;
+					break;
+				}
 			}
-			cornerMenuOpen = false;
+			applyCorner(CORNER_CYCLE[(idx + 1) % CORNER_CYCLE.length]);
 			return true;
 		}
 
-		// Filas: clic abre el editor; clic en el icono empieza a arrastrar
+		// Filas: clic abre el editor, chip de lado cambia el lado, clic en el icono arrastra
+		int listY = PANEL_Y + LIST_DY;
 		List<CobbleTabsConfig.TabEntry> list = currentList();
 		for (int row = 0; row < VISIBLE_ROWS; row++) {
 			int index = scroll + row;
 			if (index >= list.size()) {
 				break;
 			}
-			int y = PANEL_Y + 20 + row * ROW_H;
+			int y = listY + row * ROW_H;
 			if (mouseY >= y && mouseY < y + ROW_H && mouseX >= x0 + 3 && mouseX < x1 - 3) {
 				// ✕ al final de la fila: borrado rápido sin abrir el diálogo
 				if (mouseX >= delBoxX() - 2 && button == 0) {
 					deleteRow(index);
 					return true;
 				}
-				if (mouseX < x0 + 22 && button == 0) {
+				// Chip de lado de la fila: cicla el lado y guarda al instante (solo pestañas normales)
+				if (!adminMode && mouseX >= x0 + 118 && mouseX < x0 + 162 && button == 0) {
+					CobbleTabsConfig.TabEntry t = list.get(index);
+					String current = CobbleTabsConfig.normalizeSide(t.side);
+					int idx = 0;
+					for (int i = 0; i < SIDE_CYCLE.length; i++) {
+						if (SIDE_CYCLE[i].equals(current)) {
+							idx = i;
+							break;
+						}
+					}
+					t.side = CobbleTabsConfig.normalizeSide(SIDE_CYCLE[(idx + 1) % SIDE_CYCLE.length]);
+					save();
+					return true;
+				}
+				if (mouseX < x0 + 24 && button == 0) {
 					draggingRow = index;
 					dragStartY = mouseY;
 				} else {
@@ -763,9 +900,6 @@ public class CobbleTabsEditScreen extends Screen {
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (editing == null) {
-			if (cornerMenuOpen) {
-				return true;
-			}
 			int maxScroll = Math.max(0, currentList().size() - VISIBLE_ROWS);
 			int newScroll = scroll - (int) Math.signum(scrollY);
 			scroll = Math.max(0, Math.min(maxScroll, newScroll));

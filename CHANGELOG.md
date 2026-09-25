@@ -4,6 +4,56 @@ Todos los cambios notables de CobbleTabs se documentan aquí.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el
 versionado es SemVer (`MAJOR.MINOR.PATCH`).
 
+## [1.2.3] - 2026-09-25
+
+### Añadido
+
+- **Chip de lado en cada fila del editor**: la lista muestra un chip con el lado de cada
+  pestaña (`auto`, `izq`, `der`, `arriba`, `abajo`); un clic sobre él **cambia el lado al
+  instante** (ciclo automático → izquierda → derecha → arriba → abajo), sin abrir el diálogo
+  (solo en pestañas normales; las admin no lo muestran)
+- **Barra de scroll** en la lista del editor: ya no hace falta contar con la rueda a ciegas,
+  hay un indicador visual de la posición y las filas ganan algo de aire (9 visibles)
+- El **chip de lado del diálogo** de edición guarda y aplica al momento; en el panel, el botón
+  de **esquina de la fila admin** pasa a ser un **chip cíclico** (clic = siguiente esquina,
+  guarda al instante) con tooltip y atenuado cuando la fila admin está apagada
+- Tooltips en los chips de **negrita** y **activada**, resaltado de hover en **Guardar /
+  Cancelar** y separadores visuales en el panel y el diálogo
+
+### Cambiado
+
+- **Editor rediseñado**: panel más ancho (264 px) con cabecera separada, filas más legibles
+  (icono, nombre a color, chip de lado, comando y ✕), pie en dos filas de botones y diálogo
+  reorganizado con etiquetas sobre cada campo, vista previa del icono más grande y selectores
+  compactos en vez de los menús desplegables de 1.2.2 (el de lado y el de esquina)
+- **Las pestañas admin ya no muestran el selector "Lado del inventario"**: su posición la
+  decide la esquina de la fila admin, no el campo "side" (el campo se limpia al guardar una
+  admin y la fila de chips sube en su lugar). Antes el selector se mostraba también en las
+  admin aunque no tuviera ningún efecto
+
+## [1.2.2] - 2026-09-25
+
+### Añadido
+
+- **Lado del inventario por pestaña**: cada pestaña puede fijar su lado con el nuevo campo
+  **`"side"`** (`left`, `right`, `top` o `bottom`; también en español: `izquierda`, `derecha`,
+  `arriba`, `abajo`…). Las de lado **arriba/abajo** se dibujan colgando del borde superior o
+  inferior de la GUI, así que las pestañas ya pueden colocarse en las **4 esquinas del inventario**.
+  Vacío (`""`, el valor por defecto) = **reparto automático clásico**: la mitad a la izquierda y el
+  resto a la derecha, como siempre. En el **editor ingame**, el diálogo de edición añade un selector
+  **"Lado del inventario"** con menú desplegable (Automático / Izquierda / Derecha / Arriba / Abajo)
+- **Los efectos de estado ya no se dibujan encima de las pestañas**: cuando hay pestañas en el lado
+  derecho del inventario, la columna de efectos de vanilla se **desplaza hacia fuera** para dejarles
+  sitio; si hay pestañas en los lados **arriba/abajo**, los efectos se **ocultan** (vanilla solo mira
+  el hueco a la derecha y los pintaría sobre la fila). Implementado con el primer mixin del mod
+  (`EffectRenderingInventoryScreen`), solo activo en el inventario del jugador y solo con las
+  pestañas visibles
+
+### Cambiado
+
+- El diálogo de edición del editor es algo más alto (168 px) para hacer sitio al selector de lado;
+  los toggles de negrita/activada y los botones Guardar/Cancelar bajan 16 px
+
 ## [1.2.1] - 2026-09-24
 
 ### Añadido

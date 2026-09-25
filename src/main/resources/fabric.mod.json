@@ -15,6 +15,9 @@
 	"icon": "assets/cobbletabs/icon.png",
 	"environment": "client",
 	"accessWidener": "cobbletabs.accesswidener",
+	"mixins": [
+		"cobbletabs.mixins.json"
+	],
 	"entrypoints": {
 		"client": [
 			"com.cobbletabs.client.CobbleTabsClient"

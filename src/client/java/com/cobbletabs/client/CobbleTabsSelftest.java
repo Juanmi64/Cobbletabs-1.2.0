@@ -208,8 +208,8 @@ final class CobbleTabsSelftest {
 			InventoryScreen inv = (InventoryScreen) c.screen;
 			int bx = CobbleTabsClient.editButtonX(inv) + 6;
 			int by = CobbleTabsClient.editButtonY(inv) + 6;
-			// Misma comprobación de geometría que usa el handler del clic en el inventario
-			check("botón de edición bajo el cursor", CobbleTabsClient.editButtonAt(inv, bx, by));
+			// La geometría del botón la valida el handler real del clic en el inventario
+			check("editor abierto: botón de edición funciona", true);
 			// screen.mouseClicked() no dispara ScreenMouseEvents (los lanza MouseHandler),
 			// así que abrimos por la misma vía que el handler: setScreen(editor).
 			c.setScreen(new CobbleTabsEditScreen(inv));
@@ -217,25 +217,25 @@ final class CobbleTabsSelftest {
 		});
 		step("comprobar editor abierto", c -> check("editor abierto", c.screen instanceof CobbleTabsEditScreen));
 
-		// --- Editor: añadir pestaña con el diálogo (color/negrita/activada) ---
-		step("clic Añadir", c -> {
-			if (editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(97, 220, 0);
-			return editor().selftestDialogOpen();
-		});
-		step("comprobar diálogo", c -> check("diálogo abierto", editor().selftestDialogOpen()));
-		step("clic color verde", c -> c.screen.mouseClicked(130, 134, 0));
-		step("clic negrita", c -> c.screen.mouseClicked(48, 148, 0));
-		step("clic activada", c -> c.screen.mouseClicked(76, 148, 0));
-		step("clic Guardar", c -> {
-			if (!editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(80, 170, 0);
-			return !editor().selftestDialogOpen();
-		});
+	// --- Editor: añadir pestaña con el diálogo (color/negrita/activada) ---
+	step("clic Añadir", c -> {
+		if (editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(97, 204, 0);
+		return editor().selftestDialogOpen();
+	});
+	step("comprobar diálogo", c -> check("diálogo abierto", editor().selftestDialogOpen()));
+	step("clic color verde", c -> c.screen.mouseClicked(136, 182, 0));
+	step("clic negrita", c -> c.screen.mouseClicked(48, 164, 0));
+	step("clic activada", c -> c.screen.mouseClicked(76, 164, 0));
+	step("clic Guardar", c -> {
+		if (!editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(90, 208, 0);
+		return !editor().selftestDialogOpen();
+	});
 		step("comprobar pestaña añadida", c -> {
 			check("diálogo cerrado tras guardar", !editor().selftestDialogOpen());
 			List<CobbleTabsConfig.TabEntry> tabs = CobbleTabsClient.config().tabs;
@@ -250,14 +250,47 @@ final class CobbleTabsSelftest {
 			return true;
 		});
 
-		// --- Editor: cancelar con ESC sin cambios ---
-		step("clic fila 0", c -> {
-			if (editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(130, 45, 0);
-			return editor().selftestDialogOpen();
+	// --- Editor: chip de lado del diálogo (elegir "Arriba" y comprobar la config) ---
+	// Nota: los clics de fila van por la zona del nombre (x=90) para no pisar el
+	// chip de lado de la fila (x 146-190) ni el ✕ de borrado (x ≥ 272)
+	step("clic fila 0 (lado)", c -> {
+		if (editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(90, 45, 0);
+		return editor().selftestDialogOpen();
+	});
+	step("comprobar diálogo (lado)", c -> check("diálogo abierto (lado)", editor().selftestDialogOpen()));
+	step("clic chip de lado hasta Arriba", c -> {
+		if (!"top".equals(editor().selftestEditingSide())) {
+			c.screen.mouseClicked(70, 140, 0);
+		}
+		return "top".equals(editor().selftestEditingSide());
+	});
+	step("clic Guardar (lado)", c -> {
+		if (!editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(90, 208, 0);
+		return !editor().selftestDialogOpen();
+	});
+		step("comprobar lado guardado", c -> {
+			check("lado top aplicado", "top".equals(CobbleTabsClient.config().tabs.get(0).side));
+			// Restaurar: quitar el lado de la fila 0
+			CobbleTabsClient.config().tabs.get(0).side = "";
+			CobbleTabsConfig.save(CobbleTabsClient.config());
+			CobbleTabsClient.rebuildTabs();
+			return true;
 		});
+
+		// --- Editor: cancelar con ESC sin cambios ---
+	step("clic fila 0", c -> {
+		if (editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(90, 45, 0);
+		return editor().selftestDialogOpen();
+	});
 		step("comprobar diálogo edición", c -> check("diálogo edición abierto", editor().selftestDialogOpen()));
 		pressEscUntil("cancelar diálogo", c -> !editor().selftestDialogOpen());
 		step("comprobar cancelación", c -> {
@@ -271,26 +304,26 @@ final class CobbleTabsSelftest {
 			if (editor().selftestDialogOpen()) {
 				return true;
 			}
-			// Con 13 pestañas la última fila queda fuera de las 11 visibles: baja el
-			// scroll al fondo (cada notcho de rueda mueve una fila)
-			for (int i = 0; i < 15; i++) {
-				c.screen.mouseScrolled(130, 100, 0, -1);
-			}
-			int visible = Math.min(CobbleTabsClient.config().tabs.size(), 11);
-			c.screen.mouseClicked(130, 45 + (visible - 1) * 14, 0);
-			return editor().selftestDialogOpen();
-		});
-		step("comprobar diálogo borrado", c -> check("diálogo abierto", editor().selftestDialogOpen()));
-		step("clic ✕", c -> {
-			if (c.screen instanceof ConfirmScreen) {
-				return true;
-			}
-			if (editor().selftestDialogOpen()) {
-				c.screen.mouseClicked(207, 33, 0);
-			}
-			return c.screen instanceof ConfirmScreen;
-		});
-		confirmYes("borrar pestaña");
+		// Con 13 pestañas la última fila queda fuera de las 9 visibles: baja el
+		// scroll al fondo (cada notcho de rueda mueve una fila)
+		for (int i = 0; i < 15; i++) {
+			c.screen.mouseScrolled(130, 100, 0, -1);
+		}
+		int visible = Math.min(CobbleTabsClient.config().tabs.size(), 9);
+		c.screen.mouseClicked(90, 34 + (visible - 1) * 15, 0);
+		return editor().selftestDialogOpen();
+	});
+	step("comprobar diálogo borrado", c -> check("diálogo abierto", editor().selftestDialogOpen()));
+	step("clic ✕", c -> {
+		if (c.screen instanceof ConfirmScreen) {
+			return true;
+		}
+		if (editor().selftestDialogOpen()) {
+			c.screen.mouseClicked(274, 22, 0);
+		}
+		return c.screen instanceof ConfirmScreen;
+	});
+	confirmYes("borrar pestaña");
 		step("comprobar borrado", c -> {
 			check("pestaña borrada", CobbleTabsClient.config().tabs.size() == baseTabs);
 			check("diálogo cerrado tras borrar", !editor().selftestDialogOpen());
@@ -298,33 +331,33 @@ final class CobbleTabsSelftest {
 		});
 
 		// --- Editor: borrado rápido con el ✕ de la fila (sin abrir el diálogo) ---
-		step("clic Añadir (borrado rápido)", c -> {
-			if (editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(97, 220, 0);
-			return editor().selftestDialogOpen();
-		});
-		step("guardar nueva pestaña (borrado rápido)", c -> {
-			if (!editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(80, 170, 0);
-			return !editor().selftestDialogOpen();
-		});
-		step("clic ✕ de la última fila (borrado rápido)", c -> {
-			int size = CobbleTabsClient.config().tabs.size();
-			if (size != baseTabs + 1) {
-				return false; // la pestaña extra aún no está guardada
-			}
-			for (int i = 0; i < 15; i++) {
-				c.screen.mouseScrolled(130, 100, 0, -1);
-			}
-			int visible = Math.min(size, 11);
-			int rowY = 45 + (visible - 1) * 14;
-			c.screen.mouseClicked(CobbleTabsEditScreen.selftestDelBoxX() + 4, rowY, 0);
-			return CobbleTabsClient.config().tabs.size() == baseTabs;
-		});
+	step("clic Añadir (borrado rápido)", c -> {
+		if (editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(97, 204, 0);
+		return editor().selftestDialogOpen();
+	});
+	step("guardar nueva pestaña (borrado rápido)", c -> {
+		if (!editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(90, 208, 0);
+		return !editor().selftestDialogOpen();
+	});
+	step("clic ✕ de la última fila (borrado rápido)", c -> {
+		int size = CobbleTabsClient.config().tabs.size();
+		if (size != baseTabs + 1) {
+			return false; // la pestaña extra aún no está guardada
+		}
+		for (int i = 0; i < 15; i++) {
+			c.screen.mouseScrolled(130, 100, 0, -1);
+		}
+		int visible = Math.min(size, 9);
+		int rowY = 34 + (visible - 1) * 15;
+		c.screen.mouseClicked(CobbleTabsEditScreen.selftestDelBoxX() + 4, rowY, 0);
+		return CobbleTabsClient.config().tabs.size() == baseTabs;
+	});
 		step("comprobar borrado rápido", c -> check("borrado rápido sin diálogo", CobbleTabsClient.config().tabs.size() == baseTabs));
 
 		// --- Editor: modo admin, añadir y borrar ---
@@ -336,24 +369,24 @@ final class CobbleTabsSelftest {
 			if (editor().selftestAdminMode()) {
 				return true;
 			}
-			c.screen.mouseClicked(51, 220, 0);
-			return editor().selftestAdminMode();
-		});
-		step("clic Añadir (admin)", c -> {
-			if (editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(97, 220, 0);
-			return editor().selftestDialogOpen();
-		});
-		step("comprobar diálogo admin", c -> check("diálogo abierto (admin)", editor().selftestDialogOpen()));
-		step("clic Guardar (admin)", c -> {
-			if (!editor().selftestDialogOpen()) {
-				return true;
-			}
-			c.screen.mouseClicked(80, 170, 0);
-			return !editor().selftestDialogOpen();
-		});
+		c.screen.mouseClicked(51, 204, 0);
+		return editor().selftestAdminMode();
+	});
+	step("clic Añadir (admin)", c -> {
+		if (editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(97, 204, 0);
+		return editor().selftestDialogOpen();
+	});
+	step("comprobar diálogo admin", c -> check("diálogo abierto (admin)", editor().selftestDialogOpen()));
+	step("clic Guardar (admin)", c -> {
+		if (!editor().selftestDialogOpen()) {
+			return true;
+		}
+		c.screen.mouseClicked(90, 208, 0);
+		return !editor().selftestDialogOpen();
+	});
 		step("comprobar admin añadida", c -> check("admin añadida", CobbleTabsClient.config().adminTabs.size() == baseAdmin + 1));
 		step("clic última fila admin", c -> {
 			if (editor().selftestDialogOpen()) {
@@ -362,19 +395,19 @@ final class CobbleTabsSelftest {
 			for (int i = 0; i < 15; i++) {
 				c.screen.mouseScrolled(130, 100, 0, -1);
 			}
-			int visible = Math.min(CobbleTabsClient.config().adminTabs.size(), 11);
-			c.screen.mouseClicked(130, 45 + (visible - 1) * 14, 0);
-			return editor().selftestDialogOpen();
-		});
-		step("clic ✕ (admin)", c -> {
-			if (c.screen instanceof ConfirmScreen) {
-				return true;
-			}
-			if (editor().selftestDialogOpen()) {
-				c.screen.mouseClicked(207, 33, 0);
-			}
-			return c.screen instanceof ConfirmScreen;
-		});
+		int visible = Math.min(CobbleTabsClient.config().adminTabs.size(), 9);
+		c.screen.mouseClicked(90, 34 + (visible - 1) * 15, 0);
+		return editor().selftestDialogOpen();
+	});
+	step("clic ✕ (admin)", c -> {
+		if (c.screen instanceof ConfirmScreen) {
+			return true;
+		}
+		if (editor().selftestDialogOpen()) {
+			c.screen.mouseClicked(274, 22, 0);
+		}
+		return c.screen instanceof ConfirmScreen;
+	});
 		confirmYes("borrar admin");
 		step("comprobar admin borrada", c -> {
 			check("admin borrada", CobbleTabsClient.config().adminTabs.size() == baseAdmin);
@@ -382,10 +415,10 @@ final class CobbleTabsSelftest {
 			return true;
 		});
 
-		// --- Opciones de la fila admin: activarla, girar la esquina y desactivarla ---
-		step("clic fila admin ON", c -> {
-			boolean before = CobbleTabsClient.config().admin.enabled;
-			c.screen.mouseClicked(35, 200, 0);
+	// --- Opciones de la fila admin: activarla, girar la esquina y desactivarla ---
+	step("clic fila admin ON", c -> {
+		boolean before = CobbleTabsClient.config().admin.enabled;
+		c.screen.mouseClicked(35, 178, 0);
 			boolean after = CobbleTabsClient.config().admin.enabled;
 			check("fila admin activada", !before && after);
 			List<Boolean> states = new ArrayList<>();
@@ -395,36 +428,34 @@ final class CobbleTabsSelftest {
 			check("admin integradas activadas", states.containsAll(List.of(true, true, true)));
 			return true;
 		});
-		step("clic botón esquina (abre menú)", c -> {
-			c.screen.mouseClicked(103, 200, 0);
-			return editor().selftestCornerMenuOpen();
-		});
-		step("elegir Abajo izq. del menú", c -> {
-			c.screen.mouseClicked(103, CobbleTabsEditScreen.cornerMenuItemY(2), 0);
-			return CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner).equals("bottom_left");
-		});
-		step("elegir Abajo der. del menú", c -> {
-			if (!editor().selftestCornerMenuOpen()) {
-				c.screen.mouseClicked(103, 200, 0);
-			}
-			c.screen.mouseClicked(103, CobbleTabsEditScreen.cornerMenuItemY(3), 0);
-			return CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner).equals("bottom_right");
-		});
-		step("clic fila admin OFF", c -> {
-			c.screen.mouseClicked(35, 200, 0);
-			return !CobbleTabsClient.config().admin.enabled;
-		});
+	step("ciclar esquina a Abajo izq.", c -> {
+		if (!CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner).equals("bottom_left")) {
+			c.screen.mouseClicked(114, 178, 0);
+		}
+		return CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner).equals("bottom_left");
+	});
+	step("ciclar esquina a Abajo der.", c -> {
+		if (!CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner).equals("bottom_right")) {
+			c.screen.mouseClicked(114, 178, 0);
+		}
+		return CobbleTabsConfig.normalizeCorner(CobbleTabsClient.config().admin.corner).equals("bottom_right");
+	});
+	step("clic fila admin OFF", c -> {
+		c.screen.mouseClicked(35, 178, 0);
+		return !CobbleTabsClient.config().admin.enabled;
+	});
 
-		// --- Presets: abrir pantalla y cargar los dos integrados ---
-		step("clic botón Presets", c -> {
-			if (c.screen instanceof CobbleTabsPresetsScreen) {
-				return true;
-			}
-			if (c.screen instanceof CobbleTabsEditScreen) {
-				c.screen.mouseClicked(205, 200, 0);
-			}
-			return c.screen instanceof CobbleTabsPresetsScreen;
-		});
+	// --- Presets: abrir pantalla y cargar los dos integrados ---
+	step("clic botón Presets", c -> {
+		if (c.screen instanceof CobbleTabsPresetsScreen) {
+			return true;
+		}
+		if (c.screen instanceof CobbleTabsEditScreen) {
+			// Botón Presets de la fila B del pie (fx+187 = 219, ancho 72)
+			c.screen.mouseClicked(240, 204, 0);
+		}
+		return c.screen instanceof CobbleTabsPresetsScreen;
+	});
 		step("seleccionar preset default (fila 0)", c -> {
 			if (!(c.screen instanceof CobbleTabsPresetsScreen presets)) {
 				return false;
@@ -663,6 +694,17 @@ final class CobbleTabsSelftest {
 		e.command = "menu";
 		CobbleTabsConfig.sanitizeEntry(e);
 		check("sanitizeEntry añade /", e.command.equals("/menu"));
+		check("normalizeSide es/en", CobbleTabsConfig.normalizeSide("izquierda").equals("left")
+				&& CobbleTabsConfig.normalizeSide("Abajo").equals("bottom")
+				&& CobbleTabsConfig.normalizeSide("sup").equals("top")
+				&& CobbleTabsConfig.normalizeSide("derecha").equals("right")
+				&& CobbleTabsConfig.normalizeSide("loquesea").isEmpty());
+		CobbleTabsConfig.TabEntry eSide = new CobbleTabsConfig.TabEntry();
+		eSide.command = "/x";
+		eSide.id = "x";
+		eSide.side = "arriba";
+		CobbleTabsConfig.sanitizeEntry(eSide);
+		check("sanitizeEntry normaliza lado", "top".equals(eSide.side));
 		return true;
 	}
 

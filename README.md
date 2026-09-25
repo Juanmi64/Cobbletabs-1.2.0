@@ -10,7 +10,7 @@ Mod **cliente** para **Minecraft 1.21.1 (Fabric)** que añade pestañas en los l
 
 ## ✨ Características
 
-- **Pestañas laterales** en la GUI del inventario: hasta **5 por lado** (reparto automático según el número de pestañas)
+- **Pestañas en los 4 lados** de la GUI del inventario: laterales **izquierda/derecha** y también **arriba/abajo** (colgando del borde). Cada pestaña puede fijar su lado con `"side"`, o dejarse en automático (reparto clásico: la mitad a la izquierda y el resto a la derecha)
 - **Editor de pestañas dentro del juego** (botón de libro y pluma sobre el inventario): añade, edita, reordena y borra pestañas sin tocar el JSON — comando, icono, texto, color (incluido **RGB personalizado**) y negrita
 - **Presets**: guarda tu configuración actual como preset con nombre, genera presets nuevos, cárgalos con un clic, sobrescríbelos, elimínalos y **compártelos** copiando/pegando su JSON al portapapeles (incluye plantillas integradas "default" y "pokegalaxia"). Con **panel de detalles**: contenido del preset, acciones y **color propio por preset**
 - **4 huecos extra** de pestaña (2 por lado), desactivados por defecto: actívalos desde la config para añadir más comandos de acceso rápido sin tocar código
@@ -18,6 +18,7 @@ Mod **cliente** para **Minecraft 1.21.1 (Fabric)** que añade pestañas en los l
 - **Botón propio para ocultar/mostrar la fila admin**, con estado persistente e independiente del toggle de las pestañas laterales
 - Un clic (izquierdo o derecho) ejecuta el comando de la pestaña al instante, sin escribir en el chat
 - **Nombres en negrita y a color** (paleta rápida o **RGB personalizado**), configurables por pestaña
+- **Efectos de estado desplazados**: la columna de efectos (Velocidad, Fuerza…) se aparta sola para no dibujarse encima de las pestañas del lado derecho, y se oculta si hay pestañas en los lados arriba/abajo
 - **Logo discreto** (marca de agua) en la esquina superior derecha del inventario del jugador
 - **Botón para ocultar/mostrar** todas las pestañas, con estado persistente
 - **Archivo de configuración** en JSON: añade, reordena, renombra o desactiva pestañas sin tocar el código
@@ -29,7 +30,7 @@ Mod **cliente** para **Minecraft 1.21.1 (Fabric)** que añade pestañas en los l
 1. Instala el [Fabric Loader](https://fabricmc.net/use/installer/) para Minecraft **1.21.1**
 2. Descarga y añade a la carpeta `mods`:
    - [Fabric API](https://modrinth.com/mod/fabric-api) para 1.21.1
-   - `cobbletabs-1.2.1.jar` (este mod)
+   - `cobbletabs-1.2.3.jar` (este mod)
    - [Cobblemon](https://modrinth.com/mod/cobblemon) **(opcional)**: solo hace falta para los iconos de Cobblemon de las pestañas por defecto; sin él, esos iconos se muestran como papel y el mod funciona igual
 3. Inicia el juego. La primera vez se generará `config/cobbletabs/cobbletabs.json`
 
@@ -78,11 +79,13 @@ En tu inventario (survival **y creativo**) hay un botoncito de **libro y pluma**
 
 - **Añadir** una pestaña nueva y editar las existentes: **comando**, **icono** (id de item, con previsualización), **texto**, **color** — paleta rápida o **escribe tu RGB hex `#RRGGBB` (o un nombre) en el campo de color**, con vista previa en vivo — y **negrita**
 - **Activar/desactivar** una pestaña sin borrarla (toggle Sí/No en el diálogo)
+- **Lado del inventario** por pestaña: chip cíclico en el diálogo con **Automático / Izquierda / Derecha / Arriba / Abajo**, y también un **chip directo en cada fila de la lista** (un clic cambia el lado al instante; las pestañas admin no lo muestran: las coloca la esquina de su fila)
 - **Reordenar arrastrando** el icono de cada fila (el orden de la lista es el orden en pantalla)
+- **Lista con barra de scroll**: si tienes muchas pestañas, se ve siempre cuántas quedan fuera
 - **Borrar** una pestaña con la ✕ del diálogo o **directamente desde la lista** con el **✕ al final de cada fila** (borrado rápido, sin abrir el diálogo; los huecos extra/admin se desactivan en vez de borrarse)
 - Cambiar entre la lista de **pestañas** normales y las **admin** con el primer botón
 - **Fila admin: Sí/No**: activa o desactiva la fila de pestañas admin sin tocar el JSON (al activarla, se encienden las pestañas admin integradas para que se vea algo al instante)
-- **Esquina**: abre un menú desplegable con las **4 esquinas de la pantalla** (la activa resaltada) y aplica la que elijas
+- **Esquina**: chip cíclico con las **4 esquinas de la pantalla**; cada clic aplica la siguiente al instante
 - **Por defecto**: restaura todas las pestañas a sus valores originales (con confirmación)
 - Todo se guarda al momento en `config/cobbletabs/cobbletabs.json` y se aplica al instante
 
@@ -144,22 +147,23 @@ Edítalo con el juego cerrado **o** edítalo y pulsa **F8** para aplicarlo al mo
       "enabled": true,         // false = pestaña oculta sin borrarla
       "label": "Menu",         // nombre mostrado (vacío = traducción por defecto)
       "color": "aqua",         // color del nombre (ver tabla de colores)
-      "bold": true             // nombre en negrita
+      "bold": true,            // nombre en negrita
+      "side": "",              // lado del inventario: left, right, top, bottom (vacío = automático)
     },
-    { "id": "rtp",     "command": "/rtp",     "icon": "minecraft:ender_pearl",  "enabled": true,  "label": "RTP",     "color": "green",     "bold": true },
-    { "id": "pc",      "command": "/pc",      "icon": "cobblemon:pc",           "enabled": false, "label": "PC",      "color": "gray",      "bold": true },
-    { "id": "wiki",    "command": "/wiki",    "icon": "cobblemon:pokedex_red",  "enabled": false, "label": "Wiki",    "color": "light_red", "bold": true },
-    { "id": "daycare", "command": "/daycare", "icon": "minecraft:book",         "enabled": false, "label": "Daycare", "color": "pink",      "bold": true },
-    { "id": "daily",   "command": "/daily",   "icon": "minecraft:clock",        "enabled": false, "label": "Daily",   "color": "yellow",    "bold": true },
-    { "id": "sts",     "command": "/sts",     "icon": "cobblemon:verdant_ball", "enabled": false, "label": "STS",     "color": "white",     "bold": true },
-    { "id": "wt",      "command": "/wt",      "icon": "cobblemon:premier_ball", "enabled": false, "label": "WT",      "color": "green",     "bold": true },
+    { "id": "rtp",     "command": "/rtp",     "icon": "minecraft:ender_pearl",  "enabled": true,  "label": "RTP",     "color": "green",     "bold": true,  "side": "" },
+    { "id": "pc",      "command": "/pc",      "icon": "cobblemon:pc",           "enabled": false, "label": "PC",      "color": "gray",      "bold": true,  "side": "" },
+    { "id": "wiki",    "command": "/wiki",    "icon": "cobblemon:pokedex_red",  "enabled": false, "label": "Wiki",    "color": "light_red", "bold": true,  "side": "" },
+    { "id": "daycare", "command": "/daycare", "icon": "minecraft:book",         "enabled": false, "label": "Daycare", "color": "pink",      "bold": true,  "side": "" },
+    { "id": "daily",   "command": "/daily",   "icon": "minecraft:clock",        "enabled": false, "label": "Daily",   "color": "yellow",    "bold": true,  "side": "" },
+    { "id": "sts",     "command": "/sts",     "icon": "cobblemon:verdant_ball", "enabled": false, "label": "STS",     "color": "white",     "bold": true,  "side": "" },
+    { "id": "wt",      "command": "/wt",      "icon": "cobblemon:premier_ball", "enabled": false, "label": "WT",      "color": "green",     "bold": true,  "side": "" },
 
     // Huecos extra (2 más por lado): desactivados hasta que les pongas comando,
     // nombre e icono. Pon "enabled": true para mostrarlos.
-    { "id": "extra1", "command": "/extra1", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true },
-    { "id": "extra2", "command": "/extra2", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true },
-    { "id": "extra3", "command": "/extra3", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true },
-    { "id": "extra4", "command": "/extra4", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true }
+    { "id": "extra1", "command": "/extra1", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true, "side": "" },
+    { "id": "extra2", "command": "/extra2", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true, "side": "" },
+    { "id": "extra3", "command": "/extra3", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true, "side": "" },
+    { "id": "extra4", "command": "/extra4", "icon": "minecraft:nether_star", "enabled": false, "label": "", "color": "", "bold": true, "side": "" }
   ],
 
   // Logo del inventario
@@ -215,13 +219,23 @@ Si dejas `color` vacío o escribes un valor inválido, la pestaña usa su color 
 
 **Activar un hueco extra** (por ejemplo, el Extra 1 para un comando `/tienda`):
 ```json
-{ "id": "extra1", "command": "/tienda", "icon": "minecraft:emerald", "enabled": true, "label": "Tienda", "color": "#50C878", "bold": true }
+{ "id": "extra1", "command": "/tienda", "icon": "minecraft:emerald", "enabled": true, "label": "Tienda", "color": "#50C878", "bold": true, "side": "" }
 ```
 
 **Añadir una pestaña nueva totalmente personalizada** (se suma a las 10 y se reparte sola):
 ```json
-{ "id": "tienda", "command": "/tienda", "icon": "minecraft:emerald", "enabled": true, "label": "Tienda", "color": "#50C878", "bold": true }
+{ "id": "tienda", "command": "/tienda", "icon": "minecraft:emerald", "enabled": true, "label": "Tienda", "color": "#50C878", "bold": true, "side": "" }
 ```
+
+**Poner una pestaña en una esquina del inventario** (lado "top" con la primera posición de arriba):
+```json
+{ "id": "wiki", "command": "/wiki", "icon": "cobblemon:pokedex_red", "enabled": true, "label": "Wiki", "color": "light_red", "bold": true, "side": "top" }
+```
+
+> El campo `side` acepta `left`/`izquierda`/`izq`, `right`/`derecha`/`der`, `top`/`arriba`/`sup` y
+> `bottom`/`abajo`/`inf` (inglés o español). Vacío = reparto automático clásico (mitad izquierda,
+> mitad derecha). Las pestañas de los lados `top`/`bottom` cuelgan del borde superior/inferior de la
+> GUI y cuentan con un máximo por fila según el ancho del inventario.
 
 **Desactivar una pestaña sin borrarla:**
 ```json
@@ -245,7 +259,7 @@ Fila aparte en una **esquina de la pantalla**, fuera de la GUI del inventario, p
 - Puedes **añadir cuantas quieras** añadiendo entradas al array `adminTabs`; se apilan hacia la izquierda
 - Usan las mismas opciones que una pestaña normal (`command`, `icon`, `label`, `color`, `bold`)
 - Al hacer clic ejecutan el comando y cierran el inventario, igual que las demás
-- **Esquina configurable** con `admin.corner`: `bottom_right` (por defecto), `bottom_left`, `top_right` o `top_left`. También en español: `abajo_derecha`, `abajo_izquierda`, `arriba_derecha`, `arriba_izquierda` (o abreviado `abajo_izq`, `sup_der`…). Si otro mod tapa la esquina, mueve el conjunto a otra — desde el **editor ingame** con el botón **"Esquina"**, un desplegable con las 4 opciones
+- **Esquina configurable** con `admin.corner`: `bottom_right` (por defecto), `bottom_left`, `top_right` o `top_left`. También en español: `abajo_derecha`, `abajo_izquierda`, `arriba_derecha`, `arriba_izquierda` (o abreviado `abajo_izq`, `sup_der`…). Si otro mod tapa la esquina, mueve el conjunto a otra — desde el **editor ingame** con el **chip de esquina** de la fila admin: cada clic aplica la siguiente de las 4 opciones
 - **Botón toggle propio**: un botoncito junto a la fila (icono de barrera = visible, ojo de ender = oculta) que muestra/oculta solo la fila admin; se guarda en `admin.visible` y es independiente del toggle de las pestañas laterales. Se puede quitar con `"showToggleButton": false` dentro de `admin`
 - **Dos filas automáticas**: hasta **5 pestañas por fila** (configurable con `admin.maxPerRow`, de 1 a 8); si añades más, el resto forma una **segunda fila** hacia el interior de la pantalla (encima de la primera en las esquinas inferiores, debajo en las superiores) y el botón toggle se aparta solo para no solaparse
 - No aparecen en cofres ni enderchests
@@ -260,7 +274,7 @@ Fila aparte en una **esquina de la pantalla**, fuera de la GUI del inventario, p
 
 ```bash
 # Compilar el jar (requiere JDK 21)
-./gradlew build          # resultado en build/libs/cobbletabs-1.2.1.jar
+./gradlew build          # resultado en build/libs/cobbletabs-1.2.3.jar
 
 # Abrir el juego con el mod cargado (usa Cobblemon real descargado del Maven)
 ./gradlew runClient

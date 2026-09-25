@@ -51,10 +51,10 @@ public class CobbleTabsConfig {
 		}
 	}
 
-	/**
+/**
 	 * Lista de pestañas; edita este archivo para añadir, quitar o reordenar.
-	 * Se reparten en los laterales de la GUI: la primera mitad a la izquierda,
-	 * el resto a la derecha (máximo 5 por lado; con 10 pestañas: 5 a cada lado).
+	 * Se reparten en los lados de la GUI según su campo "side" (left/right/top/bottom;
+	 * vacío = reparto clásico: la mitad a la izquierda y el resto a la derecha).
 	 */
 	public List<TabEntry> tabs = defaultTabs();
 
@@ -121,8 +121,15 @@ public class CobbleTabsConfig {
 		public String label = "";
 		/** Color del nombre: nombre (gray, yellow, green, white, light_red, pink...) o hex #RRGGBB. Vacío = color por defecto. */
 		public String color = "";
-		/** Nombre en negrita. */
-		public boolean bold = true;
+	/** Nombre en negrita. */
+	public boolean bold = true;
+	/**
+	 * Lado del inventario donde se dibuja la pestaña: "left" (izquierda), "right"
+	 * (derecha), "top" (arriba) o "bottom" (abajo); también en español
+	 * (izquierda/izq, derecha/der, arriba/sup, abajo/inf). Vacío = reparto clásico
+	 * automático entre izquierda y derecha (comportamiento de siempre).
+	 */
+	public String side = "";
 
 		/** Copia profunda de la entrada (para presets). */
 		public TabEntry copy() {
@@ -132,9 +139,10 @@ public class CobbleTabsConfig {
 			c.icon = icon;
 			c.label = label;
 			c.color = color;
-			c.bold = bold;
-			c.enabled = enabled;
-			return c;
+		c.bold = bold;
+		c.side = side;
+		c.enabled = enabled;
+		return c;
 		}
 	}
 
@@ -229,11 +237,32 @@ public class CobbleTabsConfig {
 		if (t.color == null) {
 			t.color = "";
 		}
+		if (t.side == null) {
+			t.side = "";
+		}
+		t.side = normalizeSide(t.side);
 	}
 
 	/** Busca una pestaña por id en una lista (null si no existe). */
 	public static TabEntry findTabById(List<TabEntry> list, String id) {
 		return findTabIn(list, id);
+	}
+
+	/**
+	 * Convierte un lado escrito en inglés o español a su valor canónico inglés
+	 * (left/right/top/bottom; cadena vacía = automático).
+	 */
+	public static String normalizeSide(String s) {
+		if (s == null) {
+			return "";
+		}
+		return switch (s.trim().toLowerCase().replace(" ", "_")) {
+			case "left", "izquierda", "izq" -> "left";
+			case "right", "derecha", "der" -> "right";
+			case "top", "arriba", "sup", "superior" -> "top";
+			case "bottom", "abajo", "inf", "inferior" -> "bottom";
+			default -> "";
+		};
 	}
 
 	/** Convierte una esquina escrita en inglés o español a su valor canónico inglés. */
@@ -270,6 +299,13 @@ public class CobbleTabsConfig {
 			if (t.label == null) {
 				t.label = "";
 			}
+			if (t.color == null) {
+				t.color = "";
+			}
+			if (t.side == null) {
+				t.side = "";
+			}
+			t.side = normalizeSide(t.side);
 			clean.add(t);
 		}
 		return clean;
@@ -447,6 +483,7 @@ public class CobbleTabsConfig {
 		target.label = def.label;
 		target.color = def.color;
 		target.bold = def.bold;
+		target.side = def.side;
 		target.enabled = def.enabled;
 		return true;
 	}
